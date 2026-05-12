@@ -34,13 +34,35 @@ const fontStyles = `
     transition: background-color 0.3s ease;
   }
 
-  /* PROTECT HERO SECTION - ALWAYS DARK */
-  .hero-section-container, .hero-section-container * {
+  /* PROTECT HERO & LANDING - ALWAYS DARK & COLOR ACCURATE */
+  .hero-section-container, .landing-portal-container {
+    --portal-white: #ffffff;
+    --portal-dim: rgba(255, 255, 255, 0.1);
+  }
+
+  /* Specific color locks for Landing Portal elements */
+  .landing-portal-container .text-accent { color: var(--accent-color) !important; }
+  .landing-portal-container .text-white\/10 { color: var(--portal-dim) !important; }
+  .landing-portal-container .text-white\/20 { color: rgba(255, 255, 255, 0.2) !important; }
+  .landing-portal-container .text-white\/40 { color: rgba(255, 255, 255, 0.4) !important; }
+  .landing-portal-container .text-white\/60 { color: rgba(255, 255, 255, 0.6) !important; }
+  .landing-portal-container .bg-white\/5 { background-color: rgba(255, 255, 255, 0.05) !important; }
+
+  /* Input Lock */
+  .landing-portal-container input {
+    color: var(--portal-white) !important;
+    -webkit-text-fill-color: var(--portal-white) !important;
+  }
+  .landing-portal-container input::placeholder {
+    color: var(--portal-dim) !important;
+    -webkit-text-fill-color: var(--portal-dim) !important;
+  }
+
+  /* Ensure main text elements don't inherit light-theme brown, but allow specific colors */
+  .landing-portal-container p:not(.text-accent), 
+  .landing-portal-container span:not(.text-accent):not(.text-white\/10) {
     color: white !important;
   }
-  .hero-section-container .text-white\\/40 { color: rgba(255,255,255,0.4) !important; }
-  .hero-section-container .text-white\\/60 { color: rgba(255,255,255,0.6) !important; }
-  .hero-section-container .bg-white\\/5 { background-color: rgba(255,255,255,0.05) !important; }
 
   /* LIGHT MODE SPECIFICS */
   body.light-theme {
@@ -48,20 +70,20 @@ const fontStyles = `
     color: var(--text-dark);
   }
 
-  /* Scope everything NOT in hero-section to be light-themed when body has the class */
-  body.light-theme .flex-1.relative:not(.hero-section-container) {
+  /* Scope everything NOT in hero-section or landing-portal to be light-themed when body has the class */
+  body.light-theme .flex-1.relative:not(.hero-section-container):not(.landing-portal-container) {
     color: var(--text-dark);
   }
 
   /* Text Color Helpers for Light Mode */
-  body.light-theme .flex-1.relative:not(.hero-section-container) .text-white { color: var(--text-dark) !important; }
-  body.light-theme .flex-1.relative:not(.hero-section-container) .text-white\\/20 { color: rgba(42, 29, 17, 0.2) !important; }
-  body.light-theme .flex-1.relative:not(.hero-section-container) .text-white\\/30 { color: rgba(42, 29, 17, 0.3) !important; }
-  body.light-theme .flex-1.relative:not(.hero-section-container) .text-white\\/40 { color: rgba(42, 29, 17, 0.4) !important; }
-  body.light-theme .flex-1.relative:not(.hero-section-container) .text-white\\/60 { color: rgba(42, 29, 17, 0.6) !important; }
-  body.light-theme .flex-1.relative:not(.hero-section-container) .text-white\\/70 { color: rgba(42, 29, 17, 0.7) !important; }
-  body.light-theme .flex-1.relative:not(.hero-section-container) .text-white\\/80 { color: rgba(42, 29, 17, 0.8) !important; }
-  body.light-theme .flex-1.relative:not(.hero-section-container) .text-white\\/90 { color: rgba(42, 29, 17, 0.9) !important; }
+  body.light-theme .flex-1.relative:not(.hero-section-container):not(.landing-portal-container) .text-white { color: var(--text-dark) !important; }
+  body.light-theme .flex-1.relative:not(.hero-section-container):not(.landing-portal-container) .text-white\/20 { color: rgba(42, 29, 17, 0.2) !important; }
+  body.light-theme .flex-1.relative:not(.hero-section-container):not(.landing-portal-container) .text-white\/30 { color: rgba(42, 29, 17, 0.3) !important; }
+  body.light-theme .flex-1.relative:not(.hero-section-container):not(.landing-portal-container) .text-white\/40 { color: rgba(42, 29, 17, 0.4) !important; }
+  body.light-theme .flex-1.relative:not(.hero-section-container):not(.landing-portal-container) .text-white\\/60 { color: rgba(42, 29, 17, 0.6) !important; }
+  body.light-theme .flex-1.relative:not(.hero-section-container):not(.landing-portal-container) .text-white\\/70 { color: rgba(42, 29, 17, 0.7) !important; }
+  body.light-theme .flex-1.relative:not(.hero-section-container):not(.landing-portal-container) .text-white\\/80 { color: rgba(42, 29, 17, 0.8) !important; }
+  body.light-theme .flex-1.relative:not(.hero-section-container):not(.landing-portal-container) .text-white\\/90 { color: rgba(42, 29, 17, 0.9) !important; }
 
   /* Border & Background Helpers for Light Mode */
   body.light-theme .flex-1.relative:not(.hero-section-container) .border-white\\/10 { border-color: rgba(0, 0, 0, 0.1) !important; }

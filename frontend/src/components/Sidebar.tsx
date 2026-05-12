@@ -1,6 +1,18 @@
-import { LayoutDashboard, Target, Calendar, BookOpen, ChevronLeft, ChevronRight, Sun, Moon, Plus, Settings, Camera, Palette, Home } from "lucide-react";
+import { 
+  LayoutDashboard, Target, Calendar, BookOpen, 
+  Settings, Home, Plus, Palette, Camera, 
+  ChevronsUpDown, UserCircle, LogOut, Sun, Moon,
+  ChevronRight,
+  UserCog,
+  Blocks,
+  FileClock,
+  MessageSquareText,
+  UserSearch,
+  GraduationCap
+} from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useState } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import Modal from "./Modal";
 
 interface SidebarProps {
@@ -19,16 +31,32 @@ const ACCENT_PRESETS = [
   { name: "Rojo", hex: "#EF4444" },
 ];
 
+const sidebarVariants = {
+  open: { width: "16rem" },
+  closed: { width: "4.5rem" },
+};
+
+const itemVariants = {
+  open: { x: 0, opacity: 1, display: "block" },
+  closed: { x: -10, opacity: 0, transitionEnd: { display: "none" } },
+};
+
+const staggerVariants = {
+  open: { transition: { staggerChildren: 0.05, delayChildren: 0.1 } },
+  closed: { transition: { staggerChildren: 0.02, staggerDirection: -1 } },
+};
+
 export default function Sidebar({ toggleTheme, isDark, setAccentColor, accentColor }: SidebarProps) {
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const [isGlobalModalOpen, setIsGlobalModalOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
+  const [isAccountOpen, setIsAccountOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isGlobalModalOpen, setIsGlobalModalOpen] = useState(false);
+  const [customImage, setCustomImage] = useState(() => localStorage.getItem("hero-custom-image") || "");
+  
   const location = useLocation();
 
-  const [customImage, setCustomImage] = useState(() => localStorage.getItem("hero-custom-image") || "");
-
   const menuItems = [
-    { name: "Inicio", path: "/", icon: Home }, // Back to landing
+    { name: "Inicio", path: "/", icon: Home },
     { name: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
     { name: "Objetivos", path: "/goals", icon: Target },
     { name: "Hábitos", path: "/habits", icon: Calendar },
@@ -39,73 +67,141 @@ export default function Sidebar({ toggleTheme, isDark, setAccentColor, accentCol
   const handleImageChange = (url: string) => {
     setCustomImage(url);
     localStorage.setItem("hero-custom-image", url);
-    window.dispatchEvent(new Event('storage')); // Notify HeroSection
+    window.dispatchEvent(new Event('storage'));
+  };
+
+  const themeColors = {
+    bg: isDark ? 'bg-black/40 backdrop-blur-3xl' : 'bg-white/40 backdrop-blur-3xl',
+    border: isDark ? 'border-white/10' : 'border-black/10',
+    text: isDark ? 'text-white/60' : 'text-[#2A1D11]/60',
+    textActive: isDark ? 'text-white' : 'text-[#2A1D11]',
+    hover: isDark ? 'hover:bg-white/5' : 'hover:bg-black/5',
   };
 
   return (
-    <div 
-      className={`h-screen flex flex-col transition-all duration-300 relative z-50 sidebar-container border-r ${isCollapsed ? 'w-20' : 'w-64'} ${isDark ? 'bg-black/40 backdrop-blur-2xl border-white/10' : 'bg-white/40 backdrop-blur-2xl border-black/10'}`}
-    >
-      <div className="p-6 flex items-center justify-between">
-        {!isCollapsed && (
-          <span className={`text-xl font-serif tracking-tight ${isDark ? 'text-white' : 'text-[#2A1D11]'}`}>Scrittapp</span>
-        )}
-        <button 
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          className={`p-2 rounded-lg transition-colors ${isDark ? 'bg-white/5 hover:bg-white/10 text-white/70' : 'bg-black/5 hover:bg-black/10 text-black/70'}`}
-        >
-          {isCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-        </button>
-      </div>
+    <>
+      <motion.div
+        className={`relative h-full border-r ${themeColors.bg} ${themeColors.border} transition-colors duration-500`}
+        initial="closed"
+        animate={isCollapsed ? "closed" : "open"}
+        variants={sidebarVariants}
+        transition={{ type: "spring", damping: 20, stiffness: 100 }}
+        onMouseEnter={() => setIsCollapsed(false)}
+        onMouseLeave={() => {
+          setIsCollapsed(true);
+          setIsAccountOpen(false);
+        }}
+      >
+        <div className="flex flex-col h-full">
+          {/* Navigation Items */}
+          <div className="flex-1 px-3 py-10 overflow-y-auto overflow-x-hidden custom-scrollbar">
+            <motion.ul variants={staggerVariants} className="space-y-1.5">
+              {menuItems.map((item) => {
+                const isActive = location.pathname === item.path;
+                return (
+                  <Link key={item.path} to={item.path}>
+                    <li className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all group relative ${
+                      isActive 
+                        ? `bg-accent/10 ${isDark ? 'text-white' : 'text-black'}` 
+                        : `${themeColors.text} ${themeColors.hover}`
+                    }`}>
+                      {isActive && (
+                        <motion.div 
+                          layoutId="activeTab"
+                          className="absolute left-0 w-1 h-6 rounded-full bg-accent"
+                          style={{ backgroundColor: accentColor }}
+                        />
+                      )}
+                      <item.icon size={20} className="shrink-0" style={{ color: isActive ? accentColor : undefined }} />
+                      <AnimatePresence>
+                        {!isCollapsed && (
+                          <motion.span 
+                            variants={itemVariants}
+                            className={`text-[13px] font-medium whitespace-nowrap ${isActive ? 'opacity-100' : 'opacity-80'}`}
+                          >
+                            {item.name}
+                          </motion.span>
+                        )}
+                      </AnimatePresence>
+                    </li>
+                  </Link>
+                );
+              })}
+            </motion.ul>
+          </div>
 
-      <div className="flex-1 px-3 py-4 space-y-1">
-        {menuItems.map((item) => {
-          const isActive = location.pathname === item.path;
-          return (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all group ${
-                isActive 
-                  ? 'bg-accent/20 text-accent border border-accent/20' 
-                  : `${isDark ? 'text-white/60 hover:bg-white/5 hover:text-white' : 'text-black/60 hover:bg-black/5 hover:text-black'}`
-              }`}
-              style={{ color: isActive ? accentColor : undefined }}
+          {/* Footer Section */}
+          <div className={`p-3 space-y-2 border-t ${themeColors.border}`}>
+            <button 
+              onClick={() => setIsGlobalModalOpen(true)}
+              className={`w-full flex items-center justify-center gap-3 p-3 rounded-xl bg-accent text-white transition-all shadow-lg hover:brightness-110 active:scale-95 ${isCollapsed ? 'px-0' : ''}`}
+              style={{ backgroundColor: accentColor, boxShadow: `0 10px 20px -5px ${accentColor}40` }}
             >
-              <item.icon size={18} style={{ color: isActive ? accentColor : undefined }} />
-              {!isCollapsed && <span className="font-medium text-[13px]">{item.name}</span>}
-            </Link>
-          );
-        })}
-      </div>
+              <Plus size={20} className="shrink-0" />
+              {!isCollapsed && <span className="text-[11px] font-bold uppercase tracking-widest whitespace-nowrap">Acceso Rápido</span>}
+            </button>
 
-      <div className="p-4 space-y-3 border-t border-black/5">
-        <button 
-          onClick={() => setIsSettingsOpen(true)}
-          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${isDark ? 'bg-white/5 hover:bg-white/10 text-white/70' : 'bg-black/5 hover:bg-black/10 text-black/70'} ${isCollapsed ? 'justify-center' : ''}`}
-        >
-          <Settings size={18} />
-          {!isCollapsed && <span className="font-medium text-[13px]">Ajustes</span>}
-        </button>
+            <button 
+              onClick={toggleTheme}
+              className={`w-full flex items-center gap-3 p-2.5 rounded-xl transition-all ${themeColors.text} ${themeColors.hover} ${isCollapsed ? 'justify-center' : ''}`}
+            >
+              {isDark ? <Sun size={20} /> : <Moon size={20} />}
+              {!isCollapsed && <span className="text-[13px] font-medium whitespace-nowrap">{isDark ? "Modo Claro" : "Modo Oscuro"}</span>}
+            </button>
 
-        <button 
-          onClick={toggleTheme}
-          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${isDark ? 'bg-white/5 hover:bg-white/10 text-white/70' : 'bg-black/5 hover:bg-black/10 text-black/70'} ${isCollapsed ? 'justify-center' : ''}`}
-        >
-          {isDark ? <Sun size={18} /> : <Moon size={18} />}
-          {!isCollapsed && <span className="font-medium text-[13px]">{isDark ? "Modo Claro" : "Modo Oscuro"}</span>}
-        </button>
+            <button 
+              onClick={() => setIsSettingsOpen(true)}
+              className={`w-full flex items-center gap-3 p-2.5 rounded-xl transition-all ${themeColors.text} ${themeColors.hover} ${isCollapsed ? 'justify-center' : ''}`}
+            >
+              <Settings size={20} />
+              {!isCollapsed && <span className="text-[13px] font-medium whitespace-nowrap">Ajustes</span>}
+            </button>
 
-        <button 
-          onClick={() => setIsGlobalModalOpen(true)}
-          className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl bg-accent hover:opacity-90 text-white transition-all shadow-xl shadow-accent/20 ${isCollapsed ? 'justify-center px-0' : ''}`}
-          style={{ backgroundColor: accentColor }}
-        >
-          <Plus size={18} />
-          {!isCollapsed && <span className="font-bold text-[12px] uppercase tracking-wider">Acceso Rápido</span>}
-        </button>
-      </div>
+            <div className="relative pt-2">
+              <button 
+                onClick={() => setIsAccountOpen(!isAccountOpen)}
+                className={`w-full flex items-center gap-3 p-2 rounded-xl transition-all ${themeColors.hover}`}
+              >
+                <div className="size-8 rounded-full bg-accent/10 border border-accent/20 flex items-center justify-center shrink-0">
+                  <UserCircle size={20} style={{ color: accentColor }} />
+                </div>
+                {!isCollapsed && (
+                  <motion.div 
+                    variants={itemVariants}
+                    className="flex items-center justify-between w-full overflow-hidden"
+                  >
+                    <div className="flex flex-col items-start overflow-hidden">
+                      <span className={`text-[12px] font-bold truncate w-full ${isDark ? 'text-white' : 'text-[#2A1D11]'}`}>Mi Cuenta</span>
+                      <span className="text-[10px] opacity-40 truncate w-full">Premium User</span>
+                    </div>
+                  </motion.div>
+                )}
+              </button>
 
+              {/* Account Dropdown */}
+              <AnimatePresence>
+                {isAccountOpen && !isCollapsed && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className={`absolute bottom-full left-0 right-0 mb-2 p-2 rounded-xl border ${themeColors.bg} ${themeColors.border} shadow-2xl z-50`}
+                  >
+                    <button className={`w-full flex items-center gap-2 p-2 rounded-lg text-xs font-medium ${themeColors.text} ${themeColors.hover}`}>
+                      <UserCircle size={14} /> Mi Perfil
+                    </button>
+                    <button className={`w-full flex items-center gap-2 p-2 rounded-lg text-xs font-medium text-red-500 hover:bg-red-500/10`}>
+                      <LogOut size={14} /> Cerrar Sesión
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Modals (Preserved from original) */}
       <Modal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} title="Ajustes de la Aplicación" isDark={isDark}>
          <div className="space-y-8">
             <section>
@@ -163,11 +259,6 @@ export default function Sidebar({ toggleTheme, isDark, setAccentColor, accentCol
             ))}
          </div>
       </Modal>
-
-      <style>{`
-        .light-theme .sidebar-container { background-color: rgba(255, 255, 255, 0.4) !important; border-right-color: rgba(42, 29, 17, 0.1) !important; }
-        .light-theme .sidebar-container * { color: #2A1D11 !important; }
-      `}</style>
-    </div>
+    </>
   );
 }

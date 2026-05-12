@@ -11,13 +11,13 @@ interface LayoutProps {
 
 export default function Layout({ toggleTheme, isDark, setAccentColor, accentColor }: LayoutProps) {
   return (
-    <div className={`min-h-screen flex flex-col overflow-y-auto transition-colors duration-500 ${isDark ? 'bg-[#050505]' : 'bg-[var(--bg-cream)]'}`}>
-      <div className="flex flex-1 relative">
+    <div className={`min-h-screen flex transition-colors duration-500 ${isDark ? 'bg-[#050505]' : 'bg-[var(--bg-cream)]'}`}>
+      <div className="sticky top-0 h-screen z-50">
         <Sidebar toggleTheme={toggleTheme} isDark={isDark} setAccentColor={setAccentColor} accentColor={accentColor} />
-        <main className="flex-1 relative overflow-hidden">
-          <Outlet />
-        </main>
       </div>
+      <main className="flex-1 relative min-w-0">
+        <Outlet />
+      </main>
     </div>
   );
 }

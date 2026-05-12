@@ -52,6 +52,7 @@ const fontStyles = `
   .landing-portal-container input {
     color: var(--portal-white) !important;
     -webkit-text-fill-color: var(--portal-white) !important;
+    caret-color: white !important;
   }
   .landing-portal-container input::placeholder {
     color: var(--portal-dim) !important;

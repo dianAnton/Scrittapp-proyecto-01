@@ -172,7 +172,10 @@ export default function LandingPage() {
         >
           <div className={`absolute inset-0 bg-accent/20 blur-3xl opacity-0 group-focus-within:opacity-100 transition-opacity duration-500`} />
 
-          <div className="relative flex items-center bg-white/5 backdrop-blur-2xl border border-white/10 rounded-2xl p-2 focus-within:border-accent/50 transition-all duration-300">
+          <div 
+            className="relative flex items-center bg-white/5 backdrop-blur-2xl border border-white/10 rounded-2xl p-2 focus-within:border-accent/50 transition-all duration-300"
+            style={{ transform: 'translateZ(0)', backfaceVisibility: 'hidden' }}
+          >
             <div className="pl-4 pr-3 text-white/10">
               <Command size={20} />
             </div>
@@ -195,7 +198,7 @@ export default function LandingPage() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                className="relative z-10 w-full bg-transparent border-none focus:ring-0 text-white text-lg md:text-xl py-3 outline-none placeholder:text-white/10 font-light"
+                className="relative z-10 w-full bg-transparent border-none focus:ring-0 text-white text-lg md:text-xl py-3 outline-none placeholder:text-white/10 font-light caret-white"
                 style={{ color: 'white' }}
               />
             </div>

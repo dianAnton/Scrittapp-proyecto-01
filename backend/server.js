@@ -120,6 +120,36 @@ app.post('/api/notes', async (req, res) => {
   res.json({ success: true });
 });
 
+// STATS
+app.get('/api/stats/streak', async (req, res) => {
+  const db = await getDb();
+  const logs = await db.all('SELECT DISTINCT date FROM habit_logs WHERE completed = 1 ORDER BY date DESC');
+  
+  if (logs.length === 0) return res.json({ streak: 0 });
+
+  let streak = 0;
+  let current = new Date();
+  const logDates = new Set(logs.map(l => l.date));
+
+  // Check if there's activity today or yesterday to start the streak
+  const today = current.toISOString().split('T')[0];
+  current.setDate(current.getDate() - 1);
+  const yesterday = current.toISOString().split('T')[0];
+
+  if (!logDates.has(today) && !logDates.has(yesterday)) {
+    return res.json({ streak: 0 });
+  }
+
+  let d = logDates.has(today) ? new Date(today + "T00:00:00") : new Date(yesterday + "T00:00:00");
+  
+  while (logDates.has(d.toISOString().split('T')[0])) {
+    streak++;
+    d.setDate(d.getDate() - 1);
+  }
+
+  res.json({ streak });
+});
+
 app.listen(PORT, () => {
   console.log(`Backend corriendo en http://localhost:${PORT}`);
 });

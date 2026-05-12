@@ -5,20 +5,15 @@ import HeroSection from "./components/HeroSection";
 interface LayoutProps {
   toggleTheme: () => void;
   isDark: boolean;
+  setAccentColor: (color: string) => void;
+  accentColor: string;
 }
 
-export default function Layout({ toggleTheme, isDark }: LayoutProps) {
-  const location = useLocation();
-  const isDashboard = location.pathname === "/";
-
+export default function Layout({ toggleTheme, isDark, setAccentColor, accentColor }: LayoutProps) {
   return (
-    <div className={`min-h-screen flex flex-col overflow-y-auto transition-colors duration-500 ${isDark ? 'bg-[#050505]' : 'bg-[#FDFCF0]'}`}>
-      {/* Hero Section at the very top */}
-      {isDashboard && <HeroSection />}
-      
-      {/* App Interface below the Hero */}
+    <div className={`min-h-screen flex flex-col overflow-y-auto transition-colors duration-500 ${isDark ? 'bg-[#050505]' : 'bg-[var(--bg-cream)]'}`}>
       <div className="flex flex-1 relative">
-        <Sidebar toggleTheme={toggleTheme} isDark={isDark} />
+        <Sidebar toggleTheme={toggleTheme} isDark={isDark} setAccentColor={setAccentColor} accentColor={accentColor} />
         <main className="flex-1 relative overflow-hidden">
           <Outlet />
         </main>

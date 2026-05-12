@@ -76,9 +76,9 @@ export default function Dashboard({ isDark }: { isDark: boolean }) {
     const opacity = opacities[Math.min(streak - 1, 4)];
     const color = habits.find(h => h.id === habitId)?.color_theme || 'emerald';
     const colorClasses: Record<string, string> = {
-      emerald: 'bg-emerald-500', blue: 'bg-blue-500', cyan: 'bg-cyan-500', red: 'bg-red-500', orange: 'bg-orange-500', purple: 'bg-purple-500', pink: 'bg-pink-500', indigo: 'bg-indigo-500', yellow: 'bg-yellow-500'
+      emerald: 'bg-emerald-500', blue: 'bg-blue-500', cyan: 'bg-cyan-500', red: 'bg-red-500', orange: 'bg-accent', purple: 'bg-purple-500', pink: 'bg-pink-500', indigo: 'bg-indigo-500', yellow: 'bg-yellow-500'
     };
-    return `${colorClasses[color]} ${opacity}`;
+    return `${colorClasses[color] || 'bg-accent'} ${opacity}`;
   };
 
   const calculateStats = (habitId: number) => {
@@ -99,8 +99,8 @@ export default function Dashboard({ isDark }: { isDark: boolean }) {
     <div className="p-8 max-w-7xl mx-auto space-y-8 font-inter">
       <div className={`backdrop-blur-3xl border rounded-2xl p-10 transition-all ${isDark ? 'bg-white/5 border-white/10' : 'bg-white/60 border-black/10 shadow-xl'}`}>
          <div className="flex items-center justify-between mb-8">
-            <h2 className={`text-2xl font-bold flex items-center gap-3 font-sf ${isDark ? 'text-white' : 'text-[#2A1D11]'}`}><Target className="text-orange-500" /> Metas Prioritarias</h2>
-            <button onClick={() => navigate('/goals')} className="text-orange-500 font-bold text-sm hover:underline flex items-center gap-2">Ver todas <ArrowRight size={16} /></button>
+            <h2 className={`text-2xl font-bold flex items-center gap-3 font-sf ${isDark ? 'text-white' : 'text-[#2A1D11]'}`}><Target className="text-accent" /> Metas Prioritarias</h2>
+            <button onClick={() => navigate('/goals')} className="text-accent font-bold text-sm hover:underline flex items-center gap-2">Ver todas <ArrowRight size={16} /></button>
          </div>
          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {goals.slice(0, 2).map(goal => (
@@ -133,8 +133,8 @@ export default function Dashboard({ isDark }: { isDark: boolean }) {
                 const isToday = date === getLocalDateString(new Date());
                 return (
                   <div key={date} className="flex flex-col items-center">
-                    <span className={`text-[10px] uppercase font-bold ${isToday ? 'text-emerald-500' : 'opacity-40'}`}>{d.toLocaleDateString('es-ES', { weekday: 'short' })}</span>
-                    <span className={`text-sm font-bold ${isToday ? 'text-emerald-600' : 'opacity-60'}`}>{d.getDate()}</span>
+                    <span className={`text-[10px] uppercase font-bold ${isToday ? 'text-accent' : 'opacity-40'}`}>{d.toLocaleDateString('es-ES', { weekday: 'short' })}</span>
+                    <span className={`text-sm font-bold ${isToday ? 'opacity-100' : 'opacity-60'}`} style={{ color: isToday ? 'var(--accent-color)' : undefined }}>{d.getDate()}</span>
                   </div>
                 );
               })}

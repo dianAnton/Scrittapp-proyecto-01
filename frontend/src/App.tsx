@@ -15,9 +15,17 @@ const fontStyles = `
   .font-sf { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
 
   :root {
-    --bg-cream: #FDFCF0;
+    --bg-cream: #F3EFE0; /* Even warmer bone/cream color */
     --text-dark: #2A1D11;
+    --accent-color: #F97316; /* Default orange, but will be overridden */
   }
+
+  /* Accent Color Application */
+  .text-accent { color: var(--accent-color) !important; }
+  .bg-accent { background-color: var(--accent-color) !important; }
+  .border-accent { border-color: var(--accent-color) !important; }
+  .shadow-accent { shadow-color: var(--accent-color) !important; }
+  .ring-accent { --tw-ring-color: var(--accent-color) !important; }
 
   /* BASE STYLES - DARK MODE DEFAULT */
   body {
@@ -75,10 +83,21 @@ const fontStyles = `
   body:not(.light-theme) .text-white\\/60 { color: rgba(255, 255, 255, 0.6) !important; }
 `;
 
+import LandingPage from "./pages/LandingPage";
+
 export default function App() {
   const [isDark, setIsDark] = useState(() => {
     return localStorage.getItem("theme") !== "light";
   });
+
+  const [accentColor, setAccentColor] = useState(() => {
+    return localStorage.getItem("accent-color") || "#F97316";
+  });
+
+  useEffect(() => {
+    document.documentElement.style.setProperty("--accent-color", accentColor);
+    localStorage.setItem("accent-color", accentColor);
+  }, [accentColor]);
 
   useEffect(() => {
     if (isDark) {
@@ -97,8 +116,9 @@ export default function App() {
       <style>{fontStyles}</style>
       <BrowserRouter>
         <Routes>
-          <Route element={<Layout toggleTheme={toggleTheme} isDark={isDark} />}>
-            <Route path="/" element={<Dashboard isDark={isDark} />} />
+          <Route path="/" element={<LandingPage />} />
+          <Route element={<Layout toggleTheme={toggleTheme} isDark={isDark} setAccentColor={setAccentColor} accentColor={accentColor} />}>
+            <Route path="/dashboard" element={<Dashboard isDark={isDark} />} />
             <Route path="/goals" element={<GoalsView isDark={isDark} />} />
             <Route path="/goals/:id" element={<GoalDetail isDark={isDark} />} />
             <Route path="/habits" element={<HabitsView isDark={isDark} />} />

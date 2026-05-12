@@ -165,7 +165,8 @@ export default function LandingPage() {
 
         <motion.form
           initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
+          animate={{ y: 0, opacity: 1, translateZ: 0 }}
+          style={{ willChange: "transform, opacity" }}
           transition={{ duration: 1, delay: 3.2, ease: [0.16, 1, 0.3, 1] }}
           onSubmit={handleCommand}
           className={`w-full max-w-xl relative group ${isError ? 'animate-shake' : ''}`}
@@ -174,7 +175,7 @@ export default function LandingPage() {
 
           <div 
             className="relative flex items-center bg-white/5 backdrop-blur-2xl border border-white/10 rounded-2xl p-2 focus-within:border-accent/50 transition-all duration-300"
-            style={{ transform: 'translateZ(0)', backfaceVisibility: 'hidden' }}
+            style={{ transform: 'translate3d(0,0,0)', backfaceVisibility: 'hidden' }}
           >
             <div className="pl-4 pr-3 text-white/10">
               <Command size={20} />

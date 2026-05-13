@@ -39,6 +39,9 @@ export default function HeroSection() {
   const { user, profile } = useAuth();
 
   useEffect(() => {
+    if (profile?.cover_url) {
+      setCustomImage(profile.cover_url);
+    }
     const dayOfYear = Math.floor(Date.now() / 86400000);
     setVerseIndex(dayOfYear % VERSES.length);
     const hour = new Date().getHours();

@@ -58,6 +58,7 @@ export default function Sidebar({ toggleTheme, isDark, setAccentColor, accentCol
   const [isGlobalModalOpen, setIsGlobalModalOpen] = useState(false);
   const [customImage, setCustomImage] = useState(() => localStorage.getItem("hero-custom-image") || "");
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
   
   const location = useLocation();
   const navigate = useNavigate();
@@ -71,10 +72,17 @@ export default function Sidebar({ toggleTheme, isDark, setAccentColor, accentCol
     { name: "Calendario", path: "/calendar", icon: Calendar },
   ];
 
-  const handleImageChange = (url: string) => {
+  const handleImageChange = async (url: string) => {
     setCustomImage(url);
     localStorage.setItem("hero-custom-image", url);
     window.dispatchEvent(new Event('storage'));
+    
+    if (profile) {
+      await supabase
+        .from('profiles')
+        .update({ cover_url: url })
+        .eq('id', profile.id);
+    }
   };
 
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -112,6 +120,33 @@ export default function Sidebar({ toggleTheme, isDark, setAccentColor, accentCol
       alert('Error al subir la imagen. Por favor, intenta de nuevo.');
     } finally {
       setIsUploadingAvatar(false);
+    }
+  };
+
+  const handleCoverUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      setIsUploadingCover(true);
+      if (!event.target.files || event.target.files.length === 0) return;
+      const file = event.target.files[0];
+      const fileExt = file.name.split('.').pop();
+      const filePath = `${profile?.id}/cover-${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      handleImageChange(publicUrl);
+    } catch (error) {
+      console.error('Error uploading cover:', error);
+      alert('Error al subir la imagen de portada.');
+    } finally {
+      setIsUploadingCover(false);
     }
   };
 
@@ -333,16 +368,22 @@ export default function Sidebar({ toggleTheme, isDark, setAccentColor, accentCol
                <label className="text-[10px] uppercase font-bold opacity-40 tracking-widest flex items-center gap-2 mb-4">
                   <Camera size={12} /> Imagen de Portada (Hero)
                </label>
-               <div className="space-y-3">
-                  <input 
-                     type="text" 
-                     placeholder="URL de la imagen..."
-                     value={customImage}
-                     onChange={(e) => handleImageChange(e.target.value)}
-                     className={`w-full border rounded-xl px-4 py-3 text-sm ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-black/5 border-black/10 text-black'}`}
-                  />
-                  <p className="text-[10px] opacity-40 italic">Introduce una URL de Unsplash o deja vacío para usar imágenes aleatorias.</p>
-               </div>
+                <div className="space-y-4">
+                  <div className="flex gap-2">
+                    <input 
+                      type="text" 
+                      placeholder="URL de la imagen..."
+                      value={customImage}
+                      onChange={(e) => handleImageChange(e.target.value)}
+                      className={`flex-1 border rounded-xl px-4 py-3 text-sm outline-none focus:border-accent transition-all ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-black/5 border-black/10 text-black'}`}
+                    />
+                    <label className={`shrink-0 flex items-center justify-center p-3 rounded-xl border border-dashed cursor-pointer hover:bg-accent/10 transition-all ${isDark ? 'border-white/20' : 'border-black/20'}`}>
+                      {isUploadingCover ? <Loader2 size={18} className="animate-spin" /> : <Plus size={18} />}
+                      <input type="file" className="hidden" accept="image/*" onChange={handleCoverUpload} disabled={isUploadingCover} />
+                    </label>
+                  </div>
+                  <p className="text-[10px] opacity-40 italic">Introduce una URL de Unsplash o sube una imagen propia para tu portada.</p>
+                </div>
             </section>
          </div>
       </Modal>

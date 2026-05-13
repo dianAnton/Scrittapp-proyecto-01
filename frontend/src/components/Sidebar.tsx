@@ -15,6 +15,8 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import Modal from "./Modal";
 import { useAuth } from "../contexts/AuthContext";
+import { supabase } from "../lib/supabaseClient";
+import { Loader2 } from "lucide-react";
 
 interface SidebarProps {
   toggleTheme: () => void;
@@ -24,18 +26,13 @@ interface SidebarProps {
 }
 
 const ACCENT_PRESETS = [
-  { name: "Naranja", hex: "#F97316" },
-  { name: "Ámbar", hex: "#F59E0B" },
-  { name: "Lima", hex: "#84CC16" },
-  { name: "Esmeralda", hex: "#10B981" },
-  { name: "Teal", hex: "#14B8A6" },
-  { name: "Cian", hex: "#06B6D4" },
-  { name: "Azul", hex: "#3B82F6" },
-  { name: "Índigo", hex: "#6366F1" },
-  { name: "Púrpura", hex: "#8B5CF6" },
-  { name: "Fucsia", hex: "#D946EF" },
-  { name: "Rosa", hex: "#EC4899" },
-  { name: "Rojo", hex: "#EF4444" },
+  { name: "Rojo Vivo", hex: "#f94144" },
+  { name: "Naranja Fuego", hex: "#f3722c" },
+  { name: "Ámbar", hex: "#f8961e" },
+  { name: "Amarillo Maíz", hex: "#f9c74f" },
+  { name: "Verde Pistacho", hex: "#90be6d" },
+  { name: "Zircón", hex: "#43aa8b" },
+  { name: "Azul Pizarra", hex: "#577590" },
 ];
 
 const sidebarVariants = {
@@ -54,12 +51,13 @@ const staggerVariants = {
 };
 
 export default function Sidebar({ toggleTheme, isDark, setAccentColor, accentColor }: SidebarProps) {
-  const { profile, signOut } = useAuth();
+  const { profile, signOut, fetchProfile } = useAuth();
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isGlobalModalOpen, setIsGlobalModalOpen] = useState(false);
   const [customImage, setCustomImage] = useState(() => localStorage.getItem("hero-custom-image") || "");
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   
   const location = useLocation();
   const navigate = useNavigate();
@@ -77,6 +75,44 @@ export default function Sidebar({ toggleTheme, isDark, setAccentColor, accentCol
     setCustomImage(url);
     localStorage.setItem("hero-custom-image", url);
     window.dispatchEvent(new Event('storage'));
+  };
+
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      setIsUploadingAvatar(true);
+      if (!event.target.files || event.target.files.length === 0) return;
+      const file = event.target.files[0];
+      const fileExt = file.name.split('.').pop();
+      const filePath = `${profile.id}/avatar-${Date.now()}.${fileExt}`;
+
+      // 1. Upload to Storage
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      // 2. Get Public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      // 3. Update Profile Table
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('id', profile.id);
+
+      if (updateError) throw updateError;
+
+      // 4. Refresh Profile in Context
+      await fetchProfile(profile.id);
+    } catch (error) {
+      console.error('Error uploading avatar:', error);
+      alert('Error al subir la imagen. Por favor, intenta de nuevo.');
+    } finally {
+      setIsUploadingAvatar(false);
+    }
   };
 
   const themeColors = {
@@ -196,26 +232,54 @@ export default function Sidebar({ toggleTheme, isDark, setAccentColor, accentCol
             </button>
 
             <div className="relative pt-2">
-              <button 
-                onClick={() => setIsAccountOpen(!isAccountOpen)}
-                className={`w-full flex items-center gap-3 p-2 rounded-xl transition-all ${themeColors.hover}`}
-              >
-                <div className="size-8 rounded-full bg-accent/10 border border-accent/20 flex items-center justify-center shrink-0">
-                  <UserCircle size={20} style={{ color: accentColor }} />
-                </div>
-                {!isCollapsed && (
-                  <motion.div 
-                    variants={itemVariants}
-                    className="flex items-center justify-between w-full overflow-hidden"
+              <div className="group/avatar relative">
+                <button 
+                  onClick={() => setIsAccountOpen(!isAccountOpen)}
+                  className={`w-full flex items-center gap-3 p-2 rounded-xl transition-all ${themeColors.hover}`}
+                >
+                  <div 
+                    onClick={(e) => {
+                      if (!isCollapsed) {
+                        e.stopPropagation();
+                        document.getElementById('avatar-upload')?.click();
+                      }
+                    }}
+                    className={`size-8 rounded-full bg-accent/10 border border-accent/20 flex items-center justify-center shrink-0 overflow-hidden relative ${!isCollapsed ? 'cursor-pointer hover:border-accent transition-colors' : ''}`}
                   >
-                    <div className="flex flex-col items-start overflow-hidden">
-                      <span className={`text-[12px] font-bold truncate w-full ${isDark ? 'text-white' : 'text-[#2A1D11]'}`}>
-                        {profile?.username || "Usuario"}
-                      </span>
-                    </div>
-                  </motion.div>
-                )}
-              </button>
+                    {isUploadingAvatar ? (
+                      <Loader2 size={16} className="animate-spin text-accent" />
+                    ) : profile?.avatar_url ? (
+                      <img src={profile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+                    ) : (
+                      <UserCircle size={20} style={{ color: accentColor }} />
+                    )}
+                    {!isCollapsed && !isUploadingAvatar && (
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/avatar:opacity-100 flex items-center justify-center transition-opacity">
+                        <Camera size={12} className="text-white" />
+                      </div>
+                    )}
+                  </div>
+                  {!isCollapsed && (
+                    <motion.div 
+                      variants={itemVariants}
+                      className="flex items-center justify-between w-full overflow-hidden"
+                    >
+                      <div className="flex flex-col items-start overflow-hidden">
+                        <span className={`text-[12px] font-bold truncate w-full ${isDark ? 'text-white' : 'text-[#2A1D11]'}`}>
+                          {profile?.username || "Usuario"}
+                        </span>
+                      </div>
+                    </motion.div>
+                  )}
+                </button>
+                <input 
+                  type="file" 
+                  id="avatar-upload" 
+                  className="hidden" 
+                  accept="image/*" 
+                  onChange={handleAvatarUpload} 
+                />
+              </div>
 
               {/* Account Popover (Floating to the right) */}
               <AnimatePresence>

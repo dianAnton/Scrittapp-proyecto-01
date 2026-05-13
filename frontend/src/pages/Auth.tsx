@@ -53,7 +53,7 @@ export default function Auth() {
   };
 
   return (
-    <div className="h-screen w-full relative overflow-hidden flex items-center justify-center bg-[#050505] selection:bg-orange-500 selection:text-white">
+    <div className="h-screen w-full relative overflow-hidden flex items-center justify-center bg-[#050505] selection:bg-white/20 selection:text-white">
       {/* Background Image Layer */}
       <div className="absolute inset-0 z-0">
         <motion.img
@@ -90,13 +90,13 @@ export default function Auth() {
                   exit={{ opacity: 0, height: 0 }}
                 >
                   <div className="relative group">
-                    <User className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-orange-500 transition-colors" size={18} />
+                    <User className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-white/60 transition-colors" size={18} />
                     <input
                       type="text"
                       placeholder="Nombre de usuario"
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-white placeholder:text-white/20 outline-none focus:border-orange-500/50 focus:bg-white/10 transition-all"
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-white placeholder:text-white/20 outline-none focus:border-white/30 focus:bg-white/10 transition-all"
                       required
                     />
                   </div>
@@ -105,25 +105,25 @@ export default function Auth() {
             </AnimatePresence>
 
             <div className="relative group">
-              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-orange-500 transition-colors" size={18} />
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-white/60 transition-colors" size={18} />
               <input
                 type="email"
                 placeholder="Correo electrónico"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-white placeholder:text-white/20 outline-none focus:border-orange-500/50 focus:bg-white/10 transition-all"
+                className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-white placeholder:text-white/20 outline-none focus:border-white/30 focus:bg-white/10 transition-all"
                 required
               />
             </div>
 
             <div className="relative group">
-              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-orange-500 transition-colors" size={18} />
+              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-white/60 transition-colors" size={18} />
               <input
                 type="password"
                 placeholder="Contraseña"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-white placeholder:text-white/20 outline-none focus:border-orange-500/50 focus:bg-white/10 transition-all"
+                className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-white placeholder:text-white/20 outline-none focus:border-white/30 focus:bg-white/10 transition-all"
                 required
               />
             </div>
@@ -132,7 +132,7 @@ export default function Auth() {
               <motion.p 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="text-orange-500 text-xs font-bold text-center mt-2"
+                className="text-red-400 text-xs font-bold text-center mt-2"
               >
                 {error}
               </motion.p>
@@ -140,7 +140,7 @@ export default function Auth() {
 
             <button
               disabled={loading}
-              className="w-full bg-orange-500 text-white font-bold py-4 rounded-2xl mt-6 flex items-center justify-center gap-2 hover:bg-orange-600 active:scale-[0.98] transition-all disabled:opacity-50 shadow-xl shadow-orange-500/20"
+              className="w-full bg-[#FDFCF0] text-[#111] font-bold py-4 rounded-2xl mt-6 flex items-center justify-center gap-2 hover:bg-white active:scale-[0.98] transition-all disabled:opacity-50 shadow-xl shadow-black/20"
             >
               {loading ? "Cargando..." : isLogin ? "Entrar" : "Empezar"}
               {!loading && <ArrowRight size={18} />}

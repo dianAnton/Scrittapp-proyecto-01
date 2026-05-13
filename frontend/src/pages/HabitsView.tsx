@@ -177,7 +177,7 @@ export default function HabitsView({ isDark }: { isDark: boolean }) {
       </div>
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingHabit ? "Refinar Hábito" : "Forjar Nuevo Hábito"} isDark={isDark}>
-        <form onSubmit={handleCreate} className="space-y-8 max-h-[80vh] overflow-y-auto px-1 custom-scrollbar">
+        <form onSubmit={handleCreate} className="space-y-8 px-1">
           <style>{`
             .custom-scrollbar::-webkit-scrollbar { width: 4px; }
             .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }

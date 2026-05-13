@@ -83,7 +83,8 @@ export default function HabitDetail({ isDark }: { isDark: boolean }) {
      const log = logsMap[ds];
      return {
         date: d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }),
-        value: habit.measure_type === 'boolean' ? (log?.completed ? 1 : 0) : (log?.value || 0),
+        completed: log?.completed ? 1 : 0,
+        actualValue: log?.value || 0,
         fullDate: ds
      };
   });
@@ -127,30 +128,61 @@ export default function HabitDetail({ isDark }: { isDark: boolean }) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-         {/* CHART SECTION */}
+         {/* COMPLETION CHART */}
          <div className={`border rounded-[2rem] p-10 backdrop-blur-3xl transition-all ${isDark ? 'bg-white/5 border-white/10' : 'bg-white/60 border-black/10 shadow-xl'}`}>
-            <h2 className={`text-xl font-bold mb-8 flex items-center gap-3 font-sf ${isDark ? 'text-white' : 'text-black'}`}><LineChartIcon className="text-emerald-500" /> {habit.measure_type === 'boolean' ? 'Tasa de Completitud' : 'Progreso en el Tiempo'}</h2>
+            <h2 className={`text-xl font-bold mb-8 flex items-center gap-3 font-sf ${isDark ? 'text-white' : 'text-black'}`}><TrendingUp className="text-emerald-500" /> Consistencia (Completado)</h2>
             <div className="h-[250px] w-full">
                <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={chartData}>
                      <defs>
-                        <linearGradient id="colorVal" x1="0" y1="0" x2="0" y2="1">
+                        <linearGradient id="colorComp" x1="0" y1="0" x2="0" y2="1">
                            <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
                            <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
                         </linearGradient>
                      </defs>
                      <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)"} vertical={false} />
                      <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fontSize: 10, opacity: 0.3, fill: isDark ? '#fff' : '#000'}} />
-                     <YAxis hide={habit.measure_type === 'boolean'} axisLine={false} tickLine={false} tick={{fontSize: 10, opacity: 0.3, fill: isDark ? '#fff' : '#000'}} />
+                     <YAxis hide domain={[0, 1]} axisLine={false} tickLine={false} />
                      <Tooltip 
                         contentStyle={{ backgroundColor: isDark ? '#161616' : '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
                         itemStyle={{ fontSize: '12px', fontWeight: 'bold' }}
+                        formatter={(value: any) => [value === 1 ? 'Completado' : 'Pendiente', 'Estado']}
                      />
-                     <Area type="monotone" dataKey="value" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorVal)" />
+                     <Area type="stepAfter" dataKey="completed" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorComp)" />
                   </AreaChart>
                </ResponsiveContainer>
             </div>
          </div>
+
+         {/* QUANTITY/TIME CHART (Only for non-boolean) */}
+         {habit.measure_type !== 'boolean' && (
+           <div className={`border rounded-[2rem] p-10 backdrop-blur-3xl transition-all ${isDark ? 'bg-white/5 border-white/10' : 'bg-white/60 border-black/10 shadow-xl'}`}>
+              <h2 className={`text-xl font-bold mb-8 flex items-center gap-3 font-sf ${isDark ? 'text-white' : 'text-black'}`}>
+                {habit.measure_type === 'time' ? <Clock className="text-blue-500" /> : <TrendingUp className="text-blue-500" />} 
+                Crecimiento ({habit.measure_type === 'time' ? 'Minutos' : habit.unit || 'Cantidad'})
+              </h2>
+              <div className="h-[250px] w-full">
+                 <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={chartData}>
+                       <defs>
+                          <linearGradient id="colorVal" x1="0" y1="0" x2="0" y2="1">
+                             <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                             <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                          </linearGradient>
+                       </defs>
+                       <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)"} vertical={false} />
+                       <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fontSize: 10, opacity: 0.3, fill: isDark ? '#fff' : '#000'}} />
+                       <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, opacity: 0.3, fill: isDark ? '#fff' : '#000'}} />
+                       <Tooltip 
+                          contentStyle={{ backgroundColor: isDark ? '#161616' : '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
+                          itemStyle={{ fontSize: '12px', fontWeight: 'bold' }}
+                       />
+                       <Area type="monotone" dataKey="actualValue" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorVal)" />
+                    </AreaChart>
+                 </ResponsiveContainer>
+              </div>
+           </div>
+         )}
 
          {/* HEATMAP SECTION */}
          <div className={`border rounded-[2rem] p-10 backdrop-blur-3xl transition-all ${isDark ? 'bg-white/5 border-white/10' : 'bg-white/60 border-black/10 shadow-xl'}`}>

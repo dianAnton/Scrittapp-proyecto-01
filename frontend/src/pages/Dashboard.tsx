@@ -4,6 +4,7 @@ import { motion } from "motion/react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
+import Modal from "../components/Modal";
 
 const getLocalDateString = (d: Date) => {
   const offset = d.getTimezoneOffset() * 60000;
@@ -18,6 +19,7 @@ export default function Dashboard({ isDark }: { isDark: boolean }) {
   const [offsetDays, setOffsetDays] = useState(0);
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [logModal, setLogModal] = useState<{ isOpen: boolean, habit: any, date: string, value: string } | null>(null);
 
   const daysCount = 14;
   const today = new Date();
@@ -34,7 +36,7 @@ export default function Dashboard({ isDark }: { isDark: boolean }) {
     try {
       const [hRes, gRes, lRes] = await Promise.all([
         supabase.from("habits").select("*"),
-        supabase.from("goals").select("*").order("created_at", { ascending: false }),
+        supabase.from("goals").select("*").eq("completed", false).order("created_at", { ascending: false }),
         supabase.from("habit_logs").select("*")
       ]);
       
@@ -58,6 +60,11 @@ export default function Dashboard({ isDark }: { isDark: boolean }) {
     const isCompleted = logsMap[`${habitId}-${date}`];
     const habit = habits.find(h => h.id === habitId);
     
+    if (!isCompleted && habit && habit.measure_type !== 'boolean') {
+      setLogModal({ isOpen: true, habit, date, value: habit.target_value?.toString() || "" });
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from("habit_logs")
@@ -71,6 +78,30 @@ export default function Dashboard({ isDark }: { isDark: boolean }) {
 
       if (error) throw error;
       fetchData();
+    } catch (e) { console.error(e); }
+  };
+
+  const handleLogSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !logModal) return;
+    
+    const val = parseFloat(logModal.value);
+    const isCompleted = val >= (logModal.habit.target_value || 0);
+
+    try {
+      const { error } = await supabase
+        .from("habit_logs")
+        .upsert({
+          user_id: user.id,
+          habit_id: logModal.habit.id,
+          date: logModal.date,
+          completed: isCompleted,
+          value: val
+        }, { onConflict: 'habit_id, date' });
+
+      if (error) throw error;
+      fetchData();
+      setLogModal(null);
     } catch (e) { console.error(e); }
   };
 
@@ -128,15 +159,15 @@ export default function Dashboard({ isDark }: { isDark: boolean }) {
             <h2 className={`text-2xl font-bold flex items-center gap-3 font-sf ${isDark ? 'text-white' : 'text-[#2A1D11]'}`}><Target className="text-accent" /> Metas y Objetivos</h2>
             <button onClick={() => navigate('/goals')} className="text-accent font-bold text-sm hover:underline flex items-center gap-2">Ver todas <ArrowRight size={16} /></button>
          </div>
-         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {goals.map(goal => {
                const progress = calculateGoalProgress(goal);
                return (
-                  <div key={goal.id} onClick={() => navigate(`/goals/${goal.id}`)} className={`p-6 rounded-2xl border flex items-center gap-6 hover:scale-[1.02] transition-all cursor-pointer group ${isDark ? 'bg-black/20 border-white/5' : 'bg-black/5 border-black/5'}`}>
-                     <div className={`p-4 rounded-xl ${goal.color?.replace('bg-', 'bg-opacity-20 text-') || 'bg-accent/20 text-accent'} text-white`}>
+                  <div key={goal.id} onClick={() => navigate(`/goals/${goal.id}`)} className={`p-4 rounded-2xl border flex items-center gap-4 hover:scale-[1.02] transition-all cursor-pointer group ${isDark ? 'bg-black/20 border-white/5' : 'bg-black/5 border-black/5'}`}>
+                     <div className={`p-3 rounded-xl ${goal.color?.replace('bg-', 'bg-opacity-20 text-') || 'bg-accent/20 text-accent'} text-white`}>
                         {goal.type === 'amount' ? <Zap size={20} /> : <Target size={20} />}
                      </div>
-                     <div className="flex-1">
+                     <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-1">
                            <div className="flex items-center gap-2 truncate">
                               <div className={`w-1.5 h-1.5 rounded-full ${goal.color || 'bg-accent'}`} />
@@ -207,6 +238,30 @@ export default function Dashboard({ isDark }: { isDark: boolean }) {
           </div>
         </div>
       </div>
+      
+      {logModal && (
+        <Modal isOpen={logModal.isOpen} onClose={() => setLogModal(null)} title="Registrar Avance" isDark={isDark}>
+           <form onSubmit={handleLogSubmit} className="space-y-6">
+              <div>
+                 <p className="text-sm opacity-60 mb-4">Hábito: <span className="font-bold opacity-100">{logModal.habit.title}</span></p>
+                 <label className={`text-[10px] uppercase font-bold tracking-widest ml-1 ${isDark ? 'text-white/40' : 'text-black/40'}`}>
+                    {logModal.habit.measure_type === 'time' ? 'Minutos realizados' : `Cantidad (${logModal.habit.unit || 'unidades'})`}
+                 </label>
+                 <input 
+                   type="number" 
+                   step="any" 
+                   required 
+                   autoFocus
+                   value={logModal.value} 
+                   onChange={(e) => setLogModal({ ...logModal, value: e.target.value })} 
+                   className={`w-full border rounded-xl px-6 py-5 mt-2 focus:border-accent outline-none transition-colors text-2xl font-bold ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-black/5 border-black/10 text-black'}`} 
+                 />
+                 <p className="text-[10px] opacity-40 mt-3 italic text-center">Meta del día: {logModal.habit.target_value} {logModal.habit.unit || (logModal.habit.measure_type === 'time' ? 'min' : '')}</p>
+              </div>
+              <button className="w-full bg-accent hover:brightness-110 text-white font-bold py-5 rounded-xl text-lg shadow-xl transition-all active:scale-95">Guardar Progreso</button>
+           </form>
+        </Modal>
+      )}
     </div>
   );
 }

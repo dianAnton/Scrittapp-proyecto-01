@@ -1,4 +1,4 @@
-import { Target, Plus, Calendar as CalendarIcon, Hash, CheckCircle2, Trash2, ArrowRight } from "lucide-react";
+import { Target, Plus, Calendar as CalendarIcon, Hash, CheckCircle2, Trash2, ArrowRight, Check } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Modal from "../components/Modal";
@@ -101,6 +101,20 @@ export default function GoalsView({ isDark }: { isDark: boolean }) {
     if (error) console.error(error);
     else fetchGoals();
   };
+  const handleToggleComplete = async (goal: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const { error } = await supabase
+      .from("goals")
+      .update({ completed: !goal.completed })
+      .eq("id", goal.id);
+    
+    if (error) console.error(error);
+    else fetchGoals();
+  };
+
+  const activeGoals = goals.filter(g => !g.completed);
+  const completedGoals = goals.filter(g => g.completed);
+
 
   return (
     <div className="p-8 max-w-7xl mx-auto font-inter">
@@ -109,13 +123,10 @@ export default function GoalsView({ isDark }: { isDark: boolean }) {
           <h1 className={`text-4xl font-bold flex items-center gap-4 ${isDark ? 'text-white' : 'text-[#2A1D11]'}`}>
             <Target className="text-accent w-10 h-10" /> Objetivos y Metas
           </h1>
-          <p className={`mt-2 text-lg font-light ${isDark ? 'text-white/60' : 'text-black/40'}`}>Estructura tus ambiciones de forma clara.</p>
         </div>
         <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 px-6 py-3 rounded-xl bg-accent hover:brightness-110 text-white font-bold shadow-xl transition-all active:scale-95"><Plus size={20} /> Nueva Meta</button>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {goals.map((goal) => {
+      </div>       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {activeGoals.map((goal) => {
           const colorMap: any = {
             'bg-red-500': 'bg-red-500/20 text-red-500 border-red-500/20',
             'bg-amber-500': 'bg-amber-500/20 text-amber-500 border-amber-500/20',
@@ -124,14 +135,17 @@ export default function GoalsView({ isDark }: { isDark: boolean }) {
           const colorClass = colorMap[goal.color] || 'bg-accent/20 text-accent border-accent/20';
 
           return (
-            <div key={goal.id} onClick={() => navigate(`/goals/${goal.id}`)} className={`group cursor-pointer border rounded-2xl p-8 transition-all relative overflow-hidden backdrop-blur-3xl ${isDark ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-white/60 border-black/10 hover:bg-white/80'}`}>
+            <div key={goal.id} onClick={() => navigate(`/goals/${goal.id}`)} className={`group cursor-pointer border rounded-2xl p-8 transition-all relative overflow-hidden backdrop-blur-3xl ${isDark ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-white/60 border-black/10 hover:bg-white/80 shadow-lg'}`}>
               <div className="flex items-start justify-between mb-6 relative z-10">
                 <div className={`px-4 py-2 rounded-full ${colorClass} font-bold text-[9px] uppercase tracking-widest border`}>
                    {goal.priority === 'high' ? 'Alta Prioridad' : goal.priority === 'medium' ? 'Prioridad Media' : 'Prioridad Baja'}
                 </div>
-                <button onClick={(e) => handleDelete(goal.id, e)} className={`p-2 rounded-lg transition-all opacity-0 group-hover:opacity-100 ${isDark ? 'text-red-500/60 hover:text-red-500' : 'text-red-600/60 hover:text-red-600'}`}><Trash2 size={18} /></button>
+                <div className="flex items-center gap-1">
+                  <button onClick={(e) => handleToggleComplete(goal, e)} className={`p-2 rounded-lg transition-all opacity-0 group-hover:opacity-100 ${isDark ? 'hover:bg-emerald-500/10 text-emerald-500/60 hover:text-emerald-500' : 'hover:bg-emerald-500/5 text-emerald-600/60 hover:text-emerald-600'}`} title="Marcar como completado"><Check size={18} /></button>
+                  <button onClick={(e) => handleDelete(goal.id, e)} className={`p-2 rounded-lg transition-all opacity-0 group-hover:opacity-100 ${isDark ? 'text-red-500/60 hover:text-red-500' : 'text-red-600/60 hover:text-red-600'}`} title="Eliminar meta"><Trash2 size={18} /></button>
+                </div>
               </div>
-              <h3 className={`text-xl font-bold mb-2 font-sf ${isDark ? 'text-white' : 'text-[#2A1D11]'}`}>{goal.title}</h3>
+              <h3 className={`text-xl font-bold mb-2 font-sf truncate block ${isDark ? 'text-white' : 'text-[#2A1D11]'}`}>{goal.title}</h3>
               <p className={`text-sm opacity-40 line-clamp-2 mb-6 ${isDark ? 'text-white' : 'text-black'}`}>{goal.description || "Sin descripción"}</p>
               <div className={`pt-6 border-t flex items-center justify-between text-[11px] font-bold uppercase tracking-widest opacity-40 ${isDark ? 'border-white/5 text-white' : 'border-black/5 text-black'}`}>
                  <span className="flex items-center gap-2"><CalendarIcon size={12} /> {goal.target_date || "Sin plazo"}</span>
@@ -141,6 +155,33 @@ export default function GoalsView({ isDark }: { isDark: boolean }) {
           );
         })}
       </div>
+
+      {completedGoals.length > 0 && (
+        <div className="mt-20">
+          <h2 className={`text-2xl font-bold mb-8 opacity-40 flex items-center gap-3 ${isDark ? 'text-white' : 'text-black'}`}>Metas Completadas ({completedGoals.length})</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 opacity-40 hover:opacity-100 transition-opacity">
+            {completedGoals.map((goal) => (
+              <div key={goal.id} onClick={() => navigate(`/goals/${goal.id}`)} className={`group cursor-pointer border rounded-2xl p-8 transition-all relative overflow-hidden backdrop-blur-3xl ${isDark ? 'bg-white/5 border-white/10' : 'bg-white/60 border-black/10 hover:bg-white/80'}`}>
+                <div className="flex items-start justify-between mb-6 relative z-10">
+                  <div className={`px-4 py-2 rounded-full bg-emerald-500/10 text-emerald-500 border-emerald-500/20 font-bold text-[9px] uppercase tracking-widest border`}>
+                     Completado
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button onClick={(e) => handleToggleComplete(goal, e)} className={`p-2 rounded-lg transition-all opacity-0 group-hover:opacity-100 ${isDark ? 'hover:bg-blue-500/10 text-blue-500/60 hover:text-blue-500' : 'hover:bg-blue-500/5 text-blue-600/60 hover:text-blue-600'}`} title="Desmarcar"><ArrowRight size={18} className="rotate-180" /></button>
+                    <button onClick={(e) => handleDelete(goal.id, e)} className={`p-2 rounded-lg transition-all opacity-0 group-hover:opacity-100 ${isDark ? 'text-red-500/60 hover:text-red-500' : 'text-red-600/60 hover:text-red-600'}`}><Trash2 size={18} /></button>
+                  </div>
+                </div>
+                <h3 className={`text-xl font-bold mb-2 font-sf line-through ${isDark ? 'text-white' : 'text-[#2A1D11]'}`}>{goal.title}</h3>
+                <p className={`text-sm opacity-40 line-clamp-2 mb-6 ${isDark ? 'text-white' : 'text-black'}`}>{goal.description || "Sin descripción"}</p>
+                <div className={`pt-6 border-t flex items-center justify-between text-[11px] font-bold uppercase tracking-widest opacity-40 ${isDark ? 'border-white/5 text-white' : 'border-black/5 text-black'}`}>
+                   <span className="flex items-center gap-2">Completado</span>
+                   <ArrowRight size={14} className="text-accent" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Nueva Meta" isDark={isDark}>
         <form onSubmit={handleCreate} className="space-y-6">
@@ -157,12 +198,12 @@ export default function GoalsView({ isDark }: { isDark: boolean }) {
 
           <div>
             <label className={`text-[10px] uppercase font-bold tracking-widest ml-1 ${isDark ? 'text-white/40' : 'text-black/40'}`}>¿Qué quieres lograr?</label>
-            <input required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ej: Libertad financiera..." className={`w-full border rounded-xl px-5 py-4 mt-2 transition-colors focus:border-accent outline-none ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-black/5 border-black/10 text-black'}`} />
+            <input required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ej: Libertad financiera..." className={`w-full border rounded-xl px-6 py-5 mt-2 transition-colors focus:border-accent outline-none ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-black/5 border-black/10 text-black'}`} />
           </div>
 
           <div>
             <label className={`text-[10px] uppercase font-bold tracking-widest ml-1 ${isDark ? 'text-white/40' : 'text-black/40'}`}>Descripción (Opcional)</label>
-            <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Detalla tu objetivo..." rows={2} className={`w-full border rounded-xl px-5 py-4 mt-2 transition-colors resize-none focus:border-accent outline-none ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-black/5 border-black/10 text-black'}`} />
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Detalla tu objetivo..." rows={4} className={`w-full border rounded-xl px-6 py-5 mt-2 transition-colors focus:border-accent outline-none ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-black/5 border-black/10 text-black'}`} />
           </div>
 
           <div className="space-y-4">
@@ -207,14 +248,14 @@ export default function GoalsView({ isDark }: { isDark: boolean }) {
           {type === 'amount' && (
              <div className="animate-in fade-in slide-in-from-top-2">
                 <label className={`text-[10px] uppercase font-bold tracking-widest ml-1 ${isDark ? 'text-white/40' : 'text-black/40'}`}>Número Objetivo</label>
-                <input type="number" required value={targetNumber} onChange={(e) => setTargetNumber(e.target.value)} placeholder="Ej: 5000" className={`w-full border rounded-xl px-5 py-4 mt-2 focus:border-accent outline-none transition-colors ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-black/5 border-black/10 text-black'}`} />
+                <input type="number" required value={targetNumber} onChange={(e) => setTargetNumber(e.target.value)} placeholder="Ej: 5000" className={`w-full border rounded-xl px-6 py-5 mt-2 focus:border-accent outline-none transition-colors ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-black/5 border-black/10 text-black'}`} />
              </div>
           )}
 
           {dateType === 'specific' && (
              <div className="animate-in fade-in slide-in-from-top-2">
                 <label className={`text-[10px] uppercase font-bold tracking-widest ml-1 ${isDark ? 'text-white/40' : 'text-black/40'}`}>Fecha Límite</label>
-                <input type="date" required value={targetDate} onChange={(e) => setTargetDate(e.target.value)} className={`w-full border rounded-xl px-5 py-4 mt-2 focus:border-accent outline-none transition-colors ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-black/5 border-black/10 text-black'}`} />
+                <input type="date" required value={targetDate} onChange={(e) => setTargetDate(e.target.value)} className={`w-full border rounded-xl px-6 py-5 mt-2 focus:border-accent outline-none transition-colors ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-black/5 border-black/10 text-black'}`} />
              </div>
           )}
 

@@ -128,7 +128,6 @@ export default function HabitsView({ isDark }: { isDark: boolean }) {
           <h1 className={`text-4xl font-bold flex items-center gap-4 ${isDark ? 'text-white' : 'text-[#2A1D11]'}`}>
             <Calendar className="text-accent w-10 h-10" /> Gestión de Hábitos
           </h1>
-          <p className={`mt-2 text-lg font-light ${isDark ? 'text-white/60' : 'text-black/40'}`}>Perfecciona tus rutinas y automatiza tu éxito.</p>
         </div>
         <button onClick={() => { resetForm(); setIsModalOpen(true); }} className="px-8 py-4 rounded-xl bg-accent hover:brightness-110 text-white font-bold shadow-[0_10px_20px_rgba(var(--accent-color-rgb),0.3)] transition-all active:scale-95 flex items-center gap-2">
           <Plus size={20} /> Nuevo Hábito
@@ -147,8 +146,8 @@ export default function HabitsView({ isDark }: { isDark: boolean }) {
                   <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg" style={{ backgroundColor: themeHex }}>
                     {habit.measure_type === 'boolean' ? <Check size={20} /> : habit.measure_type === 'time' ? <Clock size={20} /> : <Hash size={20} />}
                   </div>
-                  <div>
-                    <h3 className={`text-xl font-bold font-sf ${isDark ? 'text-white' : 'text-[#2A1D11]'}`}>{habit.title}</h3>
+                  <div className="min-w-0">
+                    <h3 className={`text-xl font-bold font-sf truncate block ${isDark ? 'text-white' : 'text-[#2A1D11]'}`}>{habit.title}</h3>
                     <p className={`text-[10px] font-bold uppercase tracking-widest opacity-30 ${isDark ? 'text-white' : 'text-black'}`}>{habit.measure_type}</p>
                   </div>
                 </div>
@@ -199,18 +198,18 @@ export default function HabitsView({ isDark }: { isDark: boolean }) {
           <div className="space-y-6">
             <div>
               <label className={`text-[10px] uppercase font-bold tracking-widest ml-1 ${isDark ? 'text-white/40' : 'text-black/40'}`}>Nombre del Hábito</label>
-              <input required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ej: Meditación Profunda..." className={`w-full border rounded-xl px-5 py-4 mt-2 focus:border-accent outline-none transition-colors ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-black/5 border-black/10 text-black'}`} />
+              <input required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ej: Meditación Profunda..." className={`w-full border rounded-xl px-6 py-5 mt-2 focus:border-accent outline-none transition-colors ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-black/5 border-black/10 text-black'}`} />
             </div>
 
             <div>
               <label className={`text-[10px] uppercase font-bold tracking-widest ml-1 ${isDark ? 'text-white/40' : 'text-black/40'}`}>Propósito (Opcional)</label>
-              <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="¿Por qué este hábito transformará tu vida?" rows={2} className={`w-full border rounded-xl px-5 py-4 mt-2 resize-none focus:border-accent outline-none transition-colors ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-black/5 border-black/10 text-black'}`} />
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="¿Por qué este hábito transformará tu vida?" rows={4} className={`w-full border rounded-xl px-6 py-5 mt-2 focus:border-accent outline-none transition-colors ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-black/5 border-black/10 text-black'}`} />
             </div>
 
             <div className="grid grid-cols-2 gap-6">
                <div>
                   <label className={`text-[10px] uppercase font-bold tracking-widest ml-1 ${isDark ? 'text-white/40' : 'text-black/40'}`}>Vincular Meta</label>
-                  <select value={goalId} onChange={(e) => setGoalId(e.target.value)} className={`w-full border rounded-xl px-5 py-4 mt-2 appearance-none focus:border-accent outline-none transition-colors premium-select ${isDark ? 'bg-white/10 border-white/10 text-white' : 'bg-black/5 border-black/10 text-black'}`}>
+                  <select value={goalId} onChange={(e) => setGoalId(e.target.value)} className={`w-full border rounded-xl px-6 py-5 mt-2 appearance-none focus:border-accent outline-none transition-colors premium-select ${isDark ? 'bg-white/10 border-white/10 text-white' : 'bg-black/5 border-black/10 text-black'}`}>
                      <option value="">Ninguna</option>
                      {goals.map(g => <option key={g.id} value={g.id}>{g.title}</option>)}
                   </select>
@@ -249,11 +248,11 @@ export default function HabitsView({ isDark }: { isDark: boolean }) {
                 <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2 pt-2">
                    <div>
                       <label className={`text-[10px] uppercase font-bold tracking-widest ml-1 ${isDark ? 'text-white/30' : 'text-black/30'}`}>Objetivo {measureType === 'time' ? '(Minutos)' : ''}</label>
-                      <input type="number" required value={targetValue} onChange={(e) => setTargetValue(e.target.value)} placeholder="Ej: 30" className={`w-full border rounded-xl px-5 py-4 mt-2 focus:border-accent outline-none transition-colors ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-black/5 border-black/10 text-black'}`} />
+                      <input type="number" required value={targetValue} onChange={(e) => setTargetValue(e.target.value)} placeholder="Ej: 30" className={`w-full border rounded-xl px-6 py-5 mt-2 focus:border-accent outline-none transition-colors ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-black/5 border-black/10 text-black'}`} />
                    </div>
                    <div>
                       <label className={`text-[10px] uppercase font-bold tracking-widest ml-1 ${isDark ? 'text-white/30' : 'text-black/30'}`}>Unidad</label>
-                      <input required value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="Ej: km, pág, min" className={`w-full border rounded-xl px-5 py-4 mt-2 focus:border-accent outline-none transition-colors ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-black/5 border-black/10 text-black'}`} />
+                      <input required value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="Ej: km, pág, min" className={`w-full border rounded-xl px-6 py-5 mt-2 focus:border-accent outline-none transition-colors ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-black/5 border-black/10 text-black'}`} />
                    </div>
                 </div>
              )}

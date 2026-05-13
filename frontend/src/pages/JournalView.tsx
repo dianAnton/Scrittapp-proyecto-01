@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { FileText, ChevronLeft, Plus, Bold, Italic, Type, Download, Folder, Trash2 } from "lucide-react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { FileText, ChevronLeft, Plus, Trash2, Hash, List, Quote, Code, Minus, X, ChevronRight, PanelLeftClose, PanelLeft, Bold, Italic } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import Modal from "../components/Modal";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
@@ -13,7 +13,6 @@ const getLocalDateString = (d: Date) => {
 
 export default function JournalView({ isDark }: { isDark: boolean }) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const navigate = useNavigate();
   const { user } = useAuth();
   const dateParam = searchParams.get("date");
   const noteIdParam = searchParams.get("id");
@@ -27,10 +26,12 @@ export default function JournalView({ isDark }: { isDark: boolean }) {
   const [fontSize, setFontSize] = useState(18);
 
   const editorRef = useRef<HTMLDivElement>(null);
-  const toolbarRef = useRef<HTMLDivElement>(null);
   const [showToolbar, setShowToolbar] = useState(false);
   const [toolbarPos, setToolbarPos] = useState({ top: 0, left: 0 });
+  const [showSlashMenu, setShowSlashMenu] = useState(false);
+  const [slashMenuPos, setSlashMenuPos] = useState({ top: 0, left: 0 });
 
+  const [stats, setStats] = useState({ words: 0, chars: 0 });
   const [newNoteTitle, setNewNoteTitle] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
@@ -44,7 +45,6 @@ export default function JournalView({ isDark }: { isDark: boolean }) {
       .order("created_at", { ascending: false });
     setHistory(data || []);
     
-    // If no note selected but notes exist, select first
     if (!noteIdParam && data && data.length > 0) {
       setSearchParams({ date: activeDate, id: data[0].id });
     }
@@ -71,9 +71,10 @@ export default function JournalView({ isDark }: { isDark: boolean }) {
         .single();
       
       if (data) {
-        setTitle(data.title || "Nota sin título");
+        setTitle(data.title || "Sin título");
         if (editorRef.current) {
           editorRef.current.innerHTML = data.content || "";
+          updateStats();
         }
       }
     };
@@ -81,63 +82,86 @@ export default function JournalView({ isDark }: { isDark: boolean }) {
     fetchCurrentNote();
   }, [noteIdParam, user]);
 
+  const updateStats = () => {
+    if (!editorRef.current) return;
+    const text = editorRef.current.innerText || "";
+    const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+    const chars = text.length;
+    setStats({ words, chars });
+  };
+
   const handleSave = async () => {
     if (!editorRef.current || !user || !noteIdParam) return;
     setIsSaving(true);
     const content = editorRef.current.innerHTML;
     
-    const { error } = await supabase
+    await supabase
       .from("notes")
-      .update({ 
-        content, 
-        title: title || "Nota sin título" 
-      })
+      .update({ content, title: title || "Sin título" })
       .eq("id", noteIdParam)
       .eq("user_id", user.id);
 
-    if (error) console.error(error);
-    setTimeout(() => setIsSaving(false), 500);
-    
-    // Refresh sidebar titles
-    setHistory(prev => prev.map(n => n.id === noteIdParam ? { ...n, title: title || "Nota sin título" } : n));
+    setIsSaving(false);
+    setHistory(prev => prev.map(n => n.id === noteIdParam ? { ...n, title: title || "Sin título" } : n));
+    updateStats();
   };
 
   const createNewNote = async () => {
     if (!user) return;
-    
     const { data, error } = await supabase
       .from("notes")
-      .insert([{ 
-        user_id: user.id, 
-        date: activeDate, 
-        content: "", 
-        title: newNoteTitle || "Nueva Nota" 
-      }])
-      .select()
-      .single();
+      .insert([{ user_id: user.id, date: activeDate, content: "", title: newNoteTitle || "Nueva Nota" }])
+      .select().single();
 
     if (!error && data) {
        setIsNewNoteModalOpen(false);
        setNewNoteTitle("");
        setSearchParams({ date: activeDate, id: data.id });
        fetchDayNotes();
-    } else {
-      console.error(error);
     }
   };
 
   const handleDelete = async () => {
-    if (!noteIdParam || !confirm("¿Eliminar esta nota permanentemente?") || !user) return;
+    if (!noteIdParam || !confirm("¿Eliminar esta nota?") || !user) return;
     const { error } = await supabase.from("notes").delete().eq("id", noteIdParam).eq("user_id", user.id);
     if (!error) {
        const newHistory = history.filter(n => n.id !== noteIdParam);
        setHistory(newHistory);
-       if (newHistory.length > 0) {
-         setSearchParams({ date: activeDate, id: newHistory[0].id });
-       } else {
-         setSearchParams({ date: activeDate });
-       }
+       if (newHistory.length > 0) setSearchParams({ date: activeDate, id: newHistory[0].id });
+       else setSearchParams({ date: activeDate });
     }
+  };
+
+  const handleInput = (e: any) => {
+    const text = e.target.innerText;
+    const selection = window.getSelection();
+    if (!selection || !selection.focusNode) return;
+
+    const line = selection.focusNode.parentElement?.innerText || "";
+    
+    if (line.startsWith("# ")) {
+      execCommand('formatBlock', 'h1');
+      selection.focusNode.parentElement!.innerText = line.replace("# ", "");
+    } else if (line.startsWith("## ")) {
+      execCommand('formatBlock', 'h2');
+      selection.focusNode.parentElement!.innerText = line.replace("## ", "");
+    } else if (line.startsWith("- ")) {
+      execCommand('insertUnorderedList');
+      selection.focusNode.parentElement!.innerText = line.replace("- ", "");
+    } else if (line.startsWith("> ")) {
+      execCommand('formatBlock', 'blockquote');
+      selection.focusNode.parentElement!.innerText = line.replace("> ", "");
+    }
+
+    if (text.endsWith("/")) {
+      const rect = selection.getRangeAt(0).getBoundingClientRect();
+      setSlashMenuPos({ top: rect.top + 30, left: rect.left });
+      setShowSlashMenu(true);
+    } else {
+      setShowSlashMenu(false);
+    }
+    
+    handleSave();
   };
 
   const handleSelection = () => {
@@ -145,10 +169,7 @@ export default function JournalView({ isDark }: { isDark: boolean }) {
     if (selection && selection.toString().length > 0) {
       const range = selection.getRangeAt(0);
       const rect = range.getBoundingClientRect();
-      setToolbarPos({
-        top: rect.top - 50 + window.scrollY,
-        left: rect.left + rect.width / 2 - 50
-      });
+      setToolbarPos({ top: rect.top - 60 + window.scrollY, left: rect.left + rect.width / 2 - 80 });
       setShowToolbar(true);
     } else {
       setShowToolbar(false);
@@ -157,142 +178,190 @@ export default function JournalView({ isDark }: { isDark: boolean }) {
 
   const execCommand = (cmd: string, val: string | undefined = undefined) => {
     document.execCommand(cmd, false, val);
+    setShowSlashMenu(false);
     handleSave();
   };
 
+  const insertBlock = (type: string) => {
+    if (editorRef.current) {
+      const selection = window.getSelection();
+      if (selection && selection.focusNode) {
+        const text = selection.focusNode.textContent || "";
+        selection.focusNode.textContent = text.replace("/", "");
+      }
+      execCommand(type === 'h1' || type === 'h2' || type === 'blockquote' ? 'formatBlock' : type, type);
+    }
+  };
+
   return (
-    <div className={`flex h-screen font-inter overflow-hidden journal-container ${isDark ? 'bg-[#0d0d0d]' : 'bg-[#FDFCF0]'}`} onMouseUp={handleSelection}>
-      {/* SIDEBAR */}
-      <div className={`transition-all duration-500 border-r flex flex-col vault-sidebar relative overflow-hidden ${isVaultOpen ? 'w-72' : 'w-0'} ${isDark ? 'bg-[#161616] border-white/5' : 'bg-[#F5F4E8] border-black/5'}`}>
-        <div className="p-6 flex items-center justify-between border-b border-black/5">
-          <div className="flex flex-col">
-            <span className={`text-[10px] font-bold opacity-40 uppercase tracking-[0.2em] flex items-center gap-3 ${isDark ? 'text-white' : 'text-black'}`}>
-              <Folder size={14} className="text-accent" /> Notas del Día
-            </span>
-            <span className="text-[9px] opacity-30 mt-1 font-bold">{activeDate}</span>
-          </div>
-          <button onClick={() => setIsNewNoteModalOpen(true)} className="w-8 h-8 flex items-center justify-center hover:bg-accent/10 rounded-full text-accent transition-all"><Plus size={18} /></button>
+    <div className={`flex h-screen font-inter overflow-hidden obsidian-theme ${isDark ? 'bg-[#0f0f0f] text-[#b3b3b3]' : 'bg-white text-[#333]'}`} onMouseUp={handleSelection}>
+      
+      {/* OBSIDIAN SIDEBAR */}
+      <div className={`transition-all duration-300 flex flex-col relative overflow-hidden border-r ${isVaultOpen ? 'w-[300px]' : 'w-0'} ${isDark ? 'bg-[#1e1e1e] border-white/5' : 'bg-[#f8f8f8] border-black/5'}`}>
+        {/* Sidebar Header */}
+        <div className="flex items-center justify-between p-5 border-b border-black/5">
+           <div className="flex items-center gap-3">
+              <span className="text-[13px] font-black uppercase tracking-[0.2em] opacity-50">Explorador</span>
+           </div>
+           <div className="flex items-center gap-1">
+              <button onClick={() => setIsNewNoteModalOpen(true)} className="p-2 hover:bg-black/5 rounded-md transition-colors"><Plus size={16} strokeWidth={2.5} /></button>
+              <button onClick={() => setIsVaultOpen(false)} className="p-2 hover:bg-black/5 rounded-md transition-colors"><PanelLeftClose size={16} strokeWidth={1.5} /></button>
+           </div>
         </div>
-        <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
+
+        {/* File Tree */}
+        <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1 custom-scrollbar">
+           <div className="pl-4 py-2 flex items-center gap-3 text-[11px] font-bold opacity-30 uppercase tracking-[0.2em]">
+              <ChevronRight size={12} strokeWidth={3} /> {activeDate}
+           </div>
            {history.map(item => (
-             <div key={item.id} onClick={() => setSearchParams({ date: activeDate, id: item.id })} className={`group flex items-center gap-3 px-4 py-3 text-[13px] rounded-xl cursor-pointer transition-all ${item.id === noteIdParam ? 'bg-accent text-white shadow-lg' : isDark ? 'text-white/40 hover:bg-white/5 hover:text-white' : 'text-black/40 hover:bg-black/5 hover:text-black'}`}>
-               <FileText size={14} className={item.id === noteIdParam ? 'text-white' : 'opacity-30'} />
-               <div className="flex-1 truncate">
-                  <p className="font-bold truncate">{item.title || "Sin título"}</p>
-               </div>
+             <div key={item.id} onClick={() => setSearchParams({ date: activeDate, id: item.id })} className={`group flex items-center gap-3 px-5 py-3 rounded-sm cursor-pointer transition-all ${item.id === noteIdParam ? 'bg-accent text-white shadow-xl shadow-accent/20' : 'hover:bg-black/5 opacity-80 hover:opacity-100'}`}>
+               <FileText size={15} strokeWidth={1.5} className={item.id === noteIdParam ? 'text-white' : 'opacity-30'} />
+               <p className={`text-[14px] truncate flex-1 font-semibold ${item.id === noteIdParam ? 'text-white' : ''}`}>{item.title || "Sin título"}</p>
              </div>
            ))}
-           {history.length === 0 && (
-             <div className="py-20 text-center opacity-20">
-                <FileText size={32} className="mx-auto mb-4" />
-                <p className="text-[10px] uppercase font-bold tracking-widest">No hay notas hoy</p>
-             </div>
-           )}
         </div>
       </div>
 
-      {/* EDITOR */}
-      <div className="flex-1 flex flex-col min-w-0 editor-main relative">
-        {/* TOP BAR */}
-        <div className={`h-16 border-b flex items-center px-6 justify-between ${isDark ? 'bg-[#161616] border-white/5' : 'bg-[#F5F4E8] border-black/5'} print:hidden`}>
-           <div className="flex items-center gap-4">
-              <button onClick={() => setIsVaultOpen(!isVaultOpen)} className={`p-2 rounded-lg transition-all ${isDark ? 'hover:bg-white/5' : 'hover:bg-black/5'}`}><ChevronLeft size={20} className={isVaultOpen ? '' : 'rotate-180'} /></button>
-              <div className="h-4 w-[1px] bg-black/10 mx-1" />
-              <div className="flex items-center gap-2">
-                 <div className={`w-2 h-2 rounded-full transition-all duration-500 ${isSaving ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`} />
-                 <span className="text-[10px] font-bold uppercase tracking-widest opacity-30">{isSaving ? 'Guardando...' : 'Guardado'}</span>
-              </div>
+      {/* EDITOR MAIN AREA */}
+      <div className="flex-1 flex flex-col min-w-0 relative overflow-hidden">
+        {/* OBSIDIAN TABSBAR */}
+        <div className={`h-14 flex items-center px-4 border-b z-20 ${isDark ? 'bg-[#0f0f0f] border-white/5' : 'bg-[#f8f8f8] border-black/5'}`}>
+           {/* Sidebar Toggle when closed */}
+           {!isVaultOpen && (
+             <button onClick={() => setIsVaultOpen(true)} className="p-2 mr-4 hover:bg-black/5 rounded-lg transition-all"><PanelLeft size={20} strokeWidth={1.5} /></button>
+           )}
+
+           {/* Tab Item */}
+           <div className={`h-[calc(100%-10px)] mt-2.5 flex items-center gap-4 px-6 rounded-t-sm text-[13px] font-bold min-w-[200px] max-w-[300px] border-r border-black/5 relative transition-all group ${noteIdParam ? (isDark ? 'bg-[#1e1e1e]' : 'bg-white shadow-sm') : 'opacity-50'}`}>
+              <FileText size={14} strokeWidth={1.5} className="opacity-40" />
+              <span className="truncate flex-1">{title}</span>
+              <X size={12} className="opacity-0 group-hover:opacity-40 hover:opacity-100 cursor-pointer transition-all" />
+              <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-accent" />
            </div>
            
-           <div className="flex items-center gap-2">
-              <button onClick={handleDelete} className="p-2.5 rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-all"><Trash2 size={16} /></button>
+           <div className="flex items-center h-full ml-1">
+              <button onClick={() => setIsNewNoteModalOpen(true)} className="p-2.5 opacity-40 hover:opacity-100 hover:bg-black/5 rounded-lg transition-all"><Plus size={18} strokeWidth={1.5} /></button>
+           </div>
+           
+           <div className="flex-1" />
+           <div className="flex items-center gap-2 px-2">
+              <button onClick={handleDelete} className="p-2.5 text-red-500 hover:bg-red-500/10 rounded-lg transition-all active:scale-95"><Trash2 size={20} strokeWidth={1.5} /></button>
            </div>
         </div>
 
-        {/* FLOATING TOOLBAR */}
-        {showToolbar && (
-          <div 
-            ref={toolbarRef}
-            className={`fixed z-[100] flex items-center gap-1 p-1.5 rounded-2xl shadow-2xl animate-in zoom-in-95 duration-200 border backdrop-blur-xl ${isDark ? 'bg-black/80 border-white/10' : 'bg-white/80 border-black/10'}`}
-            style={{ top: toolbarPos.top, left: toolbarPos.left }}
-          >
-             <button onMouseDown={(e) => { e.preventDefault(); execCommand('bold'); }} className={`p-2.5 rounded-xl transition-all ${isDark ? 'text-white hover:bg-white/10' : 'text-black hover:bg-black/10'}`}><Bold size={16} /></button>
-             <button onMouseDown={(e) => { e.preventDefault(); execCommand('italic'); }} className={`p-2.5 rounded-xl transition-all ${isDark ? 'text-white hover:bg-white/10' : 'text-black hover:bg-black/10'}`}><Italic size={16} /></button>
-             <div className="w-[1px] h-4 bg-black/10 mx-1" />
-             <button onMouseDown={(e) => { e.preventDefault(); setFontSize(Math.min(32, fontSize + 2)); }} className={`p-2.5 rounded-xl transition-all ${isDark ? 'text-white hover:bg-white/10' : 'text-black hover:bg-black/10'}`}><Type size={18} /></button>
-             <button onMouseDown={(e) => { e.preventDefault(); setFontSize(Math.max(12, fontSize - 2)); }} className={`p-2.5 rounded-xl transition-all ${isDark ? 'text-white hover:bg-white/10' : 'text-black hover:bg-black/10'}`}><Type size={14} /></button>
-          </div>
-        )}
+        {/* BREADCRUMBS */}
+        <div className={`px-8 py-4 border-b text-[10px] font-black uppercase tracking-[0.2em] opacity-20 flex items-center gap-3 ${isDark ? 'border-white/5' : 'border-black/5'}`}>
+           <span>Diario</span>
+           <ChevronRight size={12} strokeWidth={3} />
+           <span>{activeDate}</span>
+           <ChevronRight size={12} strokeWidth={3} />
+           <span className="opacity-100 text-accent">{title}</span>
+        </div>
 
-        <div className="flex-1 overflow-y-auto px-8 md:px-20 lg:px-40 py-20 custom-scrollbar scroll-smooth">
-           <div className="max-w-3xl mx-auto print-content">
+        {/* EDITOR AREA */}
+        <div className="flex-1 overflow-y-auto px-6 py-12 custom-scrollbar scroll-smooth bg-transparent relative">
+           <div className="max-w-5xl mx-auto">
               {noteIdParam ? (
                 <>
                   <input 
                     value={title} 
                     onChange={(e) => setTitle(e.target.value)} 
                     onBlur={handleSave} 
-                    className={`text-6xl font-bold w-full bg-transparent border-none outline-none font-sf tracking-tighter mb-16 ${isDark ? 'text-white' : 'text-black'}`} 
-                    placeholder="Título de la nota..." 
+                    className={`text-6xl font-black w-full bg-transparent border-none outline-none tracking-tight mb-16 ${isDark ? 'text-white' : 'text-[#111]'}`} 
+                    placeholder="Sin título" 
                   />
                   <div 
                     ref={editorRef}
                     contentEditable
+                    onInput={handleInput}
                     onBlur={handleSave}
-                    onInput={handleSave}
                     style={{ fontSize: `${fontSize}px` }}
-                    className={`w-full min-h-[700px] outline-none font-inter leading-[1.8] prose prose-2xl max-w-none ${isDark ? 'prose-invert text-white/80' : 'text-black/80'}`}
+                    className={`obsidian-canvas w-full min-h-[75vh] outline-none leading-[1.9] prose prose-xl max-w-none ${isDark ? 'prose-invert text-white/70' : 'text-[#222]'}`}
                   />
                 </>
               ) : (
-                <div className="h-[60vh] flex flex-col items-center justify-center text-center space-y-6">
-                   <div className="w-24 h-24 rounded-full bg-accent/10 flex items-center justify-center text-accent">
-                      <Plus size={40} />
+                <div className="h-[75vh] flex flex-col items-center justify-center text-center space-y-10 opacity-20">
+                   <div className="w-24 h-24 rounded-lg border-4 border-dashed border-current flex items-center justify-center">
+                      <Plus size={40} strokeWidth={1} />
                    </div>
-                   <h2 className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-black'}`}>Crea tu primera nota de hoy</h2>
-                   <p className="opacity-40 max-w-xs mx-auto text-sm">Cada pensamiento cuenta. Registra lo que has aprendido o planeado para este día.</p>
-                   <button onClick={() => setIsNewNoteModalOpen(true)} className="bg-accent text-white px-8 py-4 rounded-2xl font-bold shadow-xl hover:brightness-110 transition-all active:scale-95">Empezar a escribir</button>
+                   <div className="space-y-4">
+                      <p className="text-sm font-black uppercase tracking-[0.4em]">Núcleo de Escritura</p>
+                      <p className="text-xs font-mono">Inicia un nuevo registro para capturar tus pensamientos</p>
+                   </div>
+                   <button onClick={() => setIsNewNoteModalOpen(true)} className="border-2 border-current px-12 py-5 rounded-sm hover:bg-current hover:text-white transition-all text-xs font-black uppercase tracking-widest active:scale-95">Nueva Entrada</button>
                 </div>
               )}
            </div>
         </div>
+
+        {/* OBSIDIAN STATUS BAR */}
+        <div className={`h-10 border-t px-10 flex items-center justify-end text-[10px] font-black uppercase tracking-[0.2em] opacity-30 ${isDark ? 'bg-[#1e1e1e] border-white/5' : 'bg-[#f8f8f8] border-black/5'}`}>
+           <div className="flex gap-10 items-center">
+              <span>{stats.words} palabras</span>
+              <span>{stats.chars} caracteres</span>
+              <div className="flex items-center gap-3">
+                 <div className={`w-2 h-2 rounded-full transition-all duration-500 ${isSaving ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`} />
+                 <span>{isSaving ? 'Sincronizando' : 'Sincronizado'}</span>
+              </div>
+           </div>
+        </div>
+
+        {/* FLOATING TOOLBAR */}
+        {showToolbar && (
+          <div 
+            className={`fixed z-[100] flex items-center gap-1 p-2 rounded-xl shadow-2xl animate-in zoom-in-95 duration-200 border backdrop-blur-3xl ${isDark ? 'bg-black/95 border-white/10' : 'bg-white/95 border-black/10'}`}
+            style={{ top: toolbarPos.top, left: toolbarPos.left }}
+          >
+             <button onMouseDown={(e) => { e.preventDefault(); execCommand('bold'); }} className={`p-3 hover:bg-accent/10 hover:text-accent rounded-xl transition-all`}><Bold size={16} strokeWidth={2.5} /></button>
+             <button onMouseDown={(e) => { e.preventDefault(); execCommand('italic'); }} className={`p-3 hover:bg-accent/10 hover:text-accent rounded-xl transition-all`}><Italic size={16} strokeWidth={2.5} /></button>
+             <div className="w-[1px] h-5 bg-black/10 mx-3" />
+             <button onMouseDown={(e) => { e.preventDefault(); execCommand('insertUnorderedList'); }} className={`p-3 hover:bg-accent/10 hover:text-accent rounded-xl transition-all`}><List size={16} strokeWidth={2.5} /></button>
+             <button onMouseDown={(e) => { e.preventDefault(); execCommand('formatBlock', 'blockquote'); }} className={`p-3 hover:bg-accent/10 hover:text-accent rounded-xl transition-all`}><Quote size={16} strokeWidth={2.5} /></button>
+          </div>
+        )}
       </div>
 
-      <Modal isOpen={isNewNoteModalOpen} onClose={() => setIsNewNoteModalOpen(false)} title="Nueva Nota para Hoy" isDark={isDark}>
-         <div className="space-y-6">
-            <div>
-               <label className={`text-[10px] uppercase font-bold tracking-[0.2em] ml-1 ${isDark ? 'text-white/40' : 'text-black/40'}`}>Título de la Nota</label>
-               <input autoFocus value={newNoteTitle} onChange={(e) => setNewNoteTitle(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && createNewNote()} placeholder="Ej: Ideas de la mañana..." className={`w-full border rounded-xl px-5 py-4 mt-2 focus:border-accent outline-none transition-all ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-black/5 border-black/10 text-black'}`} />
+      <Modal isOpen={isNewNoteModalOpen} onClose={() => setIsNewNoteModalOpen(false)} title="Inicializar Registro" isDark={isDark}>
+         <div className="space-y-12 py-6 bg-transparent">
+            <div className="space-y-6">
+               <div className="flex items-center gap-3 opacity-40">
+                  <FileText size={18} strokeWidth={1.5} />
+                  <span className="text-[10px] font-black uppercase tracking-[0.4em]">Configuración de Entrada</span>
+               </div>
+               <input 
+                  autoFocus 
+                  value={newNoteTitle} 
+                  onChange={(e) => setNewNoteTitle(e.target.value)} 
+                  onKeyDown={(e) => e.key === 'Enter' && createNewNote()} 
+                  placeholder="Título del registro..." 
+                  className={`w-full border-b-2 border-transparent focus:border-accent bg-transparent px-2 py-4 outline-none transition-all text-2xl font-bold ${isDark ? 'text-white placeholder-white/10' : 'text-black placeholder-black/10'}`} 
+               />
+               <p className="text-[10px] opacity-30 font-medium">El registro se guardará automáticamente en la fecha seleccionada ({activeDate}).</p>
             </div>
-            <button onClick={createNewNote} className="w-full bg-accent hover:brightness-110 text-white font-bold py-5 rounded-2xl text-lg shadow-[0_10px_20px_rgba(var(--accent-color-rgb),0.3)] transition-all active:scale-95">Crear Nota</button>
+            <div className="flex flex-col gap-3">
+               <button onClick={createNewNote} className="w-full bg-accent hover:brightness-110 text-white font-black py-6 rounded-sm text-lg shadow-2xl shadow-accent/20 transition-all active:scale-[0.98] uppercase tracking-[0.2em]">Comenzar Pensamiento</button>
+               <button onClick={() => setIsNewNoteModalOpen(false)} className={`w-full font-bold py-4 rounded-sm text-xs opacity-40 hover:opacity-100 transition-all uppercase tracking-widest ${isDark ? 'text-white' : 'text-black'}`}>Cancelar</button>
+            </div>
          </div>
       </Modal>
 
       <style>{`
-        [contenteditable]:empty:before {
-          content: "Empieza a escribir...";
-          opacity: 0.15;
-          font-style: italic;
+        .obsidian-canvas:empty:before {
+          content: "Escribe algo extraordinario hoy...";
+          opacity: 0.1;
         }
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar { width: 5px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.2); border-radius: 10px; }
         
-        @media print {
-          body * { visibility: hidden; }
-          .print-content, .print-content * { visibility: visible; }
-          .print-content { 
-            position: absolute; 
-            left: 0; 
-            top: 0; 
-            width: 100%; 
-            padding: 2cm !important;
-            background: white !important;
-            color: black !important;
-          }
-          .editor-main { background: white !important; }
-          input { border: none !important; color: black !important; font-size: 24pt !important; }
-          [contenteditable] { color: black !important; font-size: 12pt !important; line-height: 1.6 !important; }
+        .obsidian-canvas h1 { font-size: 3.5rem; font-weight: 900; letter-spacing: -0.06em; border-bottom: 2px solid rgba(128,128,128,0.1); padding-bottom: 0.75rem; margin-bottom: 2.5rem; color: inherit; }
+        .obsidian-canvas h2 { font-size: 2.25rem; font-weight: 800; letter-spacing: -0.04em; margin-top: 3.5rem; border-bottom: 1px solid rgba(128,128,128,0.05); }
+        .obsidian-canvas blockquote { border-left: 5px solid var(--accent-color); padding-left: 2.5rem; color: inherit; opacity: 0.7; font-style: italic; }
+        .obsidian-canvas pre { background: rgba(128,128,128,0.05); padding: 2rem; border-radius: 12px; font-family: ui-monospace, SFMono-Regular, monospace; font-size: 0.95em; }
+        
+        .obsidian-theme {
+          --accent-color-rgb: 79, 70, 229;
         }
       `}</style>
     </div>

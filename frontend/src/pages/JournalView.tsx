@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { FileText, ChevronLeft, Plus, Trash2, Hash, List, Quote, Code, Minus, X, ChevronRight, PanelLeftClose, PanelLeft, Bold, Italic, Type, Underline } from "lucide-react";
+import { FileText, ChevronLeft, Plus, Trash2, Hash, List, Quote, Code, Minus, X, ChevronRight, PanelLeftClose, PanelLeft, Bold, Italic, Type, Underline, Loader2 } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import Modal from "../components/Modal";
 import { supabase } from "../lib/supabaseClient";
@@ -21,7 +21,7 @@ export default function JournalView({ isDark }: { isDark: boolean }) {
 
   const [title, setTitle] = useState("");
   const [history, setHistory] = useState<any[]>([]);
-  const [openTabs, setOpenTabs] = useState<{id: string, title: string, date: string}[]>(() => {
+  const [openTabs, setOpenTabs] = useState<{id: string, title: string, date: string, type?: string}[]>(() => {
     const saved = localStorage.getItem("journal-open-tabs");
     return saved ? JSON.parse(saved) : [];
   });
@@ -36,12 +36,16 @@ export default function JournalView({ isDark }: { isDark: boolean }) {
   const [showToolbar, setShowToolbar] = useState(false);
   const [toolbarPos, setToolbarPos] = useState({ top: 0, left: 0 });
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingPDF, setIsUploadingPDF] = useState(false);
+  const [newNoteType, setNewNoteType] = useState<'text' | 'pdf'>('text');
+  const [currentNoteType, setCurrentNoteType] = useState<'text' | 'pdf'>('text');
+  const [currentFileUrl, setCurrentFileUrl] = useState("");
 
   const fetchDayNotes = async () => {
     if (!user) return;
     const { data } = await supabase
       .from("notes")
-      .select("id, title, date")
+      .select("id, title, date, type, file_url")
       .eq("date", activeDate)
       .eq("user_id", user.id)
       .order("created_at", { ascending: false });
@@ -76,18 +80,20 @@ export default function JournalView({ isDark }: { isDark: boolean }) {
         .eq("user_id", user.id)
         .single();
       
-    if (data) {
-      setTitle(data.title || "Sin título");
-      setOpenTabs(prev => {
-        if (prev.find(t => t.id === data.id)) return prev;
-        return [...prev, { id: data.id, title: data.title || "Sin título", date: data.date }];
-      });
-      if (editorRef.current && editorRef.current.innerHTML !== data.content) {
-        editorRef.current.innerHTML = data.content || "";
-        updateStats();
+      if (data) {
+        setTitle(data.title || "Sin título");
+        setCurrentNoteType(data.type || "text");
+        setCurrentFileUrl(data.file_url || "");
+        setOpenTabs(prev => {
+          if (prev.find(t => t.id === data.id)) return prev;
+          return [...prev, { id: data.id, title: data.title || "Sin título", date: data.date, type: data.type }];
+        });
+        if (data.type === 'text' && editorRef.current && editorRef.current.innerHTML !== data.content) {
+          editorRef.current.innerHTML = data.content || "";
+          updateStats();
+        }
       }
-    }
-  };
+    };
 
     fetchCurrentNote();
   }, [noteIdParam, user]);
@@ -116,7 +122,8 @@ export default function JournalView({ isDark }: { isDark: boolean }) {
   };
 
   const handleSave = async () => {
-    if (!editorRef.current || !user || !noteIdParam) return;
+    if (!user || !noteIdParam || currentNoteType === 'pdf') return;
+    if (!editorRef.current) return;
     setIsSaving(true);
     const content = editorRef.current.innerHTML;
     
@@ -135,15 +142,61 @@ export default function JournalView({ isDark }: { isDark: boolean }) {
     if (!user) return;
     const { data, error } = await supabase
       .from("notes")
-      .insert([{ user_id: user.id, date: activeDate, content: "", title: newNoteTitle || "Nueva Nota" }])
+      .insert([{ user_id: user.id, date: activeDate, content: "", title: newNoteTitle || "Nueva Nota", type: 'text' }])
       .select().single();
 
     if (!error && data) {
        setIsNewNoteModalOpen(false);
        setNewNoteTitle("");
-       setOpenTabs(prev => [...prev, { id: data.id, title: data.title || "Nueva Nota", date: data.date }]);
+       setOpenTabs(prev => [...prev, { id: data.id, title: data.title || "Nueva Nota", date: data.date, type: 'text' }]);
        setSearchParams({ date: activeDate, id: data.id });
        fetchDayNotes();
+    }
+  };
+
+  const handlePDFUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      setIsUploadingPDF(true);
+      if (!event.target.files || event.target.files.length === 0 || !user) return;
+      const file = event.target.files[0];
+      const fileExt = file.name.split('.').pop();
+      const filePath = `${user.id}/journal-${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      const { data, error: insertError } = await supabase
+        .from("notes")
+        .insert([{ 
+          user_id: user.id, 
+          date: activeDate, 
+          type: 'pdf', 
+          file_url: publicUrl, 
+          title: file.name.replace('.pdf', ''),
+          content: "[Archivo PDF]" 
+        }])
+        .select().single();
+
+      if (insertError) throw insertError;
+
+      if (data) {
+        setIsNewNoteModalOpen(false);
+        setOpenTabs(prev => [...prev, { id: data.id, title: data.title, date: data.date, type: 'pdf' }]);
+        setSearchParams({ date: activeDate, id: data.id });
+        fetchDayNotes();
+      }
+    } catch (error) {
+      console.error('Error uploading PDF:', error);
+      alert('Error al subir el PDF.');
+    } finally {
+      setIsUploadingPDF(false);
     }
   };
 
@@ -272,19 +325,19 @@ export default function JournalView({ isDark }: { isDark: boolean }) {
            <div className="pl-4 py-2 flex items-center gap-3 text-[11px] font-bold opacity-30 uppercase tracking-[0.2em]">
               <ChevronRight size={12} strokeWidth={3} /> {activeDate}
            </div>
-           {history.map(item => (
-             <div key={item.id} 
-               onClick={() => {
-                 if (!openTabs.find(t => t.id === item.id)) {
-                   setOpenTabs(prev => [...prev, { id: item.id, title: item.title || "Sin título", date: item.date }]);
-                 }
-                 setSearchParams({ date: activeDate, id: item.id });
-               }} 
-               className={`group flex items-center gap-3 px-5 py-3 rounded-sm cursor-pointer transition-all ${item.id === noteIdParam ? 'bg-accent text-white shadow-xl shadow-accent/20' : 'hover:bg-black/5 opacity-80 hover:opacity-100'}`}>
-               <FileText size={15} strokeWidth={1.5} className={item.id === noteIdParam ? 'text-white' : 'opacity-30'} />
-               <p className={`text-[14px] truncate flex-1 font-semibold ${item.id === noteIdParam ? 'text-white' : ''}`}>{item.title || "Sin título"}</p>
-             </div>
-           ))}
+            {history.map(item => (
+              <div key={item.id} 
+                onClick={() => {
+                  if (!openTabs.find(t => t.id === item.id)) {
+                    setOpenTabs(prev => [...prev, { id: item.id, title: item.title || "Sin título", date: item.date, type: item.type }]);
+                  }
+                  setSearchParams({ date: activeDate, id: item.id });
+                }} 
+                className={`group flex items-center gap-3 px-5 py-3 rounded-sm cursor-pointer transition-all ${item.id === noteIdParam ? 'bg-accent text-white shadow-xl shadow-accent/20' : 'hover:bg-black/5 opacity-80 hover:opacity-100'}`}>
+                {item.type === 'pdf' ? <Hash size={15} strokeWidth={1.5} className={item.id === noteIdParam ? 'text-white' : 'opacity-30'} /> : <FileText size={15} strokeWidth={1.5} className={item.id === noteIdParam ? 'text-white' : 'opacity-30'} />}
+                <p className={`text-[14px] truncate flex-1 font-semibold ${item.id === noteIdParam ? 'text-white' : ''}`}>{item.title || "Sin título"}</p>
+              </div>
+            ))}
         </div>
       </div>
 
@@ -359,8 +412,8 @@ export default function JournalView({ isDark }: { isDark: boolean }) {
         </div>
 
         {/* EDITOR AREA */}
-      <div className="flex-1 overflow-y-auto px-6 py-12 custom-scrollbar scroll-smooth bg-transparent relative">
-           <div className="max-w-5xl mx-auto">
+      <div className={`flex-1 ${currentNoteType === 'pdf' ? 'overflow-hidden pt-8 pb-0' : 'overflow-y-auto py-8'} px-6 custom-scrollbar scroll-smooth bg-transparent relative flex flex-col`}>
+           <div className={`${currentNoteType === 'pdf' ? 'max-w-none px-4 flex-1 flex flex-col' : 'max-w-5xl mx-auto'}`}>
               {noteIdParam ? (
                 <>
                   <input 
@@ -373,20 +426,26 @@ export default function JournalView({ isDark }: { isDark: boolean }) {
                         editorRef.current?.focus();
                       }
                     }}
-                    className={`text-6xl font-black w-full bg-transparent border-none outline-none tracking-tight mb-16 ${isDark ? 'text-white' : 'text-[#111]'}`} 
+                    className={`text-6xl font-black w-full bg-transparent border-none outline-none tracking-tight mb-12 ${isDark ? 'text-white' : 'text-[#111]'} ${currentNoteType === 'pdf' ? 'text-2xl mb-6 opacity-30' : ''}`} 
                     placeholder="Sin título" 
                   />
-                    <div 
-                      ref={editorRef}
-                      contentEditable
-                      onInput={handleInput}
-                      onKeyDown={handleKeyDown}
-                      onMouseUp={handleSelection}
-                      onKeyUp={handleSelection}
-                      onBlur={handleSave}
-                      style={{ fontSize: `${fontSize}px` }}
-                      className={`obsidian-canvas w-full min-h-[75vh] outline-none leading-[1.9] prose prose-xl max-w-none ${isDark ? 'prose-invert text-white/70' : 'text-[#222]'}`}
-                    />
+                    {currentNoteType === 'pdf' ? (
+                      <div className={`w-full flex-1 rounded-lg overflow-hidden border shadow-2xl ${isDark ? 'border-white/10' : 'border-black/10'}`}>
+                        <iframe src={currentFileUrl} className="w-full h-full border-none" title="PDF Viewer" />
+                      </div>
+                    ) : (
+                      <div 
+                        ref={editorRef}
+                        contentEditable
+                        onInput={handleInput}
+                        onKeyDown={handleKeyDown}
+                        onMouseUp={handleSelection}
+                        onKeyUp={handleSelection}
+                        onBlur={handleSave}
+                        style={{ fontSize: `${fontSize}px` }}
+                        className={`obsidian-canvas w-full min-h-[75vh] outline-none leading-[1.9] prose prose-xl max-w-none ${isDark ? 'prose-invert text-white/70' : 'text-[#222]'}`}
+                      />
+                    )}
                 </>
               ) : (
                 <div className="h-[75vh] flex flex-col items-center justify-center text-center space-y-10">
@@ -422,34 +481,74 @@ export default function JournalView({ isDark }: { isDark: boolean }) {
       </div>
 
       <Modal isOpen={isNewNoteModalOpen} onClose={() => setIsNewNoteModalOpen(false)} title="Nueva Nota" isDark={isDark}>
-         <div className="space-y-10 py-4">
-            <div className="space-y-4">
-               <label className={`text-[10px] uppercase font-bold tracking-widest ml-1 ${isDark ? 'text-white/40' : 'text-black/40'}`}>Título de la Nota</label>
-               <input 
-                  autoFocus 
-                  value={newNoteTitle} 
-                  onChange={(e) => setNewNoteTitle(e.target.value)} 
-                  onKeyDown={(e) => e.key === 'Enter' && createNewNote()} 
-                  placeholder="Ej: Ideas para el proyecto..." 
-                  className={`w-full border rounded-xl px-5 py-4 mt-2 focus:border-accent outline-none transition-colors ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-black/5 border-black/10 text-black'}`} 
-               />
-               <p className={`text-[10px] opacity-30 italic ml-1 mt-1 ${isDark ? 'text-white' : 'text-black'}`}>Se guardará automáticamente en: {activeDate}</p>
+         <div className="space-y-8 py-2">
+            <div className={`flex p-1 rounded-xl border ${isDark ? 'bg-white/5 border-white/5' : 'bg-black/5 border-black/5'}`}>
+              <button 
+                onClick={() => setNewNoteType('text')}
+                className={`flex-1 py-3 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${
+                  newNoteType === 'text' 
+                    ? (isDark ? 'bg-white/10 text-white' : 'bg-white shadow-sm text-black') 
+                    : 'opacity-40 hover:opacity-60'
+                }`}
+              >
+                Nota de Texto
+              </button>
+              <button 
+                onClick={() => setNewNoteType('pdf')}
+                className={`flex-1 py-3 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${
+                  newNoteType === 'pdf' 
+                    ? (isDark ? 'bg-white/10 text-white' : 'bg-white shadow-sm text-black') 
+                    : 'opacity-40 hover:opacity-60'
+                }`}
+              >
+                Subir PDF
+              </button>
             </div>
-            <div className="flex flex-col gap-3">
-               <button 
-                  onClick={createNewNote} 
-                  className="w-full bg-accent text-white font-bold py-5 rounded-xl text-lg transition-all active:scale-95 uppercase tracking-widest"
-               >
-                  Crear
-               </button>
-               <button 
-                  onClick={() => setIsNewNoteModalOpen(false)} 
-                  className={`w-full py-4 rounded-xl text-xs font-bold opacity-40 hover:opacity-100 transition-all uppercase tracking-widest ${isDark ? 'text-white' : 'text-black'}`}
-               >
-                  Cancelar
-               </button>
-            </div>
-         </div>
+
+            {newNoteType === 'text' ? (
+              <div className="space-y-4">
+                 <label className={`text-[10px] uppercase font-bold tracking-widest ml-1 ${isDark ? 'text-white/40' : 'text-black/40'}`}>Título de la Nota</label>
+                 <input 
+                    autoFocus 
+                    value={newNoteTitle} 
+                    onChange={(e) => setNewNoteTitle(e.target.value)} 
+                    onKeyDown={(e) => e.key === 'Enter' && createNewNote()} 
+                    placeholder="Ej: Ideas para el proyecto..." 
+                    className={`w-full border rounded-xl px-5 py-4 mt-2 focus:border-accent outline-none transition-colors ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-black/5 border-black/10 text-black'}`} 
+                 />
+                 <div className="flex flex-col gap-3 pt-4">
+                    <button 
+                       onClick={() => createNewNote()} 
+                       className="w-full bg-accent text-white font-bold py-5 rounded-xl text-lg transition-all active:scale-95 uppercase tracking-widest"
+                    >
+                       Crear Nota
+                    </button>
+                 </div>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div className={`border-2 border-dashed rounded-2xl p-10 text-center transition-all ${isDark ? 'border-white/10 hover:border-accent/50' : 'border-black/10 hover:border-accent/50'}`}>
+                  <label className="cursor-pointer flex flex-col items-center gap-4">
+                    <div className="w-16 h-16 rounded-2xl bg-accent/10 text-accent flex items-center justify-center">
+                      {isUploadingPDF ? <Loader2 size={32} className="animate-spin" /> : <Plus size={32} />}
+                    </div>
+                    <div className="space-y-1">
+                      <p className="font-bold">Selecciona un archivo PDF</p>
+                      <p className="text-[10px] opacity-40 uppercase tracking-widest">Máximo 10MB</p>
+                    </div>
+                    <input type="file" className="hidden" accept="application/pdf" onChange={handlePDFUpload} disabled={isUploadingPDF} />
+                  </label>
+                </div>
+              </div>
+            )}
+            
+            <button 
+                onClick={() => setIsNewNoteModalOpen(false)} 
+                className={`w-full py-2 rounded-xl text-xs font-bold opacity-40 hover:opacity-100 transition-all uppercase tracking-widest ${isDark ? 'text-white' : 'text-black'}`}
+             >
+                Cancelar
+             </button>
+          </div>
       </Modal>
 
       <style>{`

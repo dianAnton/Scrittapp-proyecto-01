@@ -220,15 +220,6 @@ export default function LandingPage() {
         </motion.form>
       </div>
 
-      {/* Decorative Bottom Text */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 0.3 }}
-        transition={{ delay: 1, duration: 2 }}
-        className="absolute bottom-12 text-[10px] uppercase tracking-[0.5em] text-white font-bold"
-      >
-        Press Enter to navigate
-      </motion.div>
 
       <style>{`
         @keyframes shake {

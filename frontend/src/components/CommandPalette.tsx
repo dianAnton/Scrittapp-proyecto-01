@@ -60,6 +60,10 @@ export default function CommandPalette({ isDark }: { isDark: boolean }) {
     }
   }, [input]);
 
+  const filteredCommands = Object.keys(COMMANDS).filter(c => 
+    c.startsWith(input.toLowerCase().trim())
+  );
+
   const handleInputKeyDown = (e: React.KeyboardEvent) => {
     if ((e.key === "Tab" || e.key === "ArrowRight") && suggestion) {
       e.preventDefault();
@@ -71,13 +75,24 @@ export default function CommandPalette({ isDark }: { isDark: boolean }) {
   const handleCommand = (e: React.FormEvent) => {
     e.preventDefault();
     const cmd = input.toLowerCase().trim();
+    
+    // 1. Try exact match
     if (COMMANDS[cmd]) {
       navigate(COMMANDS[cmd]);
       setIsOpen(false);
-    } else {
-      setIsError(true);
-      setTimeout(() => setIsError(false), 500);
+      return;
     }
+
+    // 2. Try current suggestion
+    if (suggestion) {
+      navigate(COMMANDS[suggestion]);
+      setIsOpen(false);
+      return;
+    }
+
+    // 3. Error if no match
+    setIsError(true);
+    setTimeout(() => setIsError(false), 500);
   };
 
   return (
@@ -94,7 +109,8 @@ export default function CommandPalette({ isDark }: { isDark: boolean }) {
           />
 
           {/* Palette Container */}
-          <motion.div
+          <motion.form
+            onSubmit={handleCommand}
             initial={{ opacity: 0, y: -20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -20, scale: 0.95 }}
@@ -141,7 +157,7 @@ export default function CommandPalette({ isDark }: { isDark: boolean }) {
               </div>
 
               <button
-                onClick={handleCommand}
+                type="submit"
                 className="p-3 rounded-xl bg-accent text-white hover:opacity-90 transition-all active:scale-95 shadow-lg shadow-accent/20"
               >
                 <ArrowRight size={20} />
@@ -150,18 +166,16 @@ export default function CommandPalette({ isDark }: { isDark: boolean }) {
 
             {/* Suggestions list */}
             <AnimatePresence>
-              {input.trim() && (
+              {input.trim() && filteredCommands.length > 0 && (
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 10 }}
-                  className={`absolute top-full left-0 w-full mt-4 flex flex-wrap gap-2 justify-center p-4 rounded-2xl border ${
-                    isDark ? 'bg-[#1a1a1a]/95 border-white/10 text-white' : 'bg-white/95 border-black/10 text-black'
+                  className={`absolute top-full left-0 w-full mt-4 flex flex-wrap gap-2 justify-center p-4 rounded-2xl border backdrop-blur-3xl shadow-2xl ${
+                    isDark ? 'bg-[#1a1a1a]/80 border-white/10 text-white' : 'bg-white/70 border-black/10 text-black'
                   }`}
                 >
-                  {Object.keys(COMMANDS)
-                    .filter(c => c.startsWith(input.toLowerCase().trim()))
-                    .map(c => (
+                  {filteredCommands.map(c => (
                       <span 
                         key={c} 
                         onClick={() => { setInput(c); setTimeout(() => inputRef.current?.focus(), 10); }}
@@ -178,7 +192,7 @@ export default function CommandPalette({ isDark }: { isDark: boolean }) {
                 </motion.div>
               )}
             </AnimatePresence>
-          </motion.div>
+          </motion.form>
 
           <style>{`
             @keyframes shake {

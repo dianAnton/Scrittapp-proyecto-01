@@ -2,8 +2,8 @@ import { Target, Plus, Calendar as CalendarIcon, Hash, CheckCircle2, Trash2, Arr
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Modal from "../components/Modal";
-
-const API_URL = "http://localhost:3001/api";
+import { supabase } from "../lib/supabaseClient";
+import { useAuth } from "../contexts/AuthContext";
 
 const COLORS = [
   { name: "Esmeralda", value: "bg-emerald-500" },
@@ -29,29 +29,61 @@ export default function GoalsView({ isDark }: { isDark: boolean }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-
+  const { user } = useAuth();
   const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   const [type, setType] = useState("generic");
-  const [dateType, setDateType] = useState("specific");
+  const [priority, setPriority] = useState("low");
+  const [dateType, setDateType] = useState<"specific" | "none">("none");
   const [targetDate, setTargetDate] = useState("");
   const [targetNumber, setTargetNumber] = useState("");
-  const [color, setColor] = useState(COLORS[0].value);
 
-  const fetchGoals = () => {
-    fetch(`${API_URL}/goals`).then(r => r.json()).then(setGoals).catch(console.error);
+  const PRIORITY_COLORS: any = {
+    high: "bg-red-500",
+    medium: "bg-amber-500",
+    low: "bg-blue-500"
   };
 
-  useEffect(() => { fetchGoals(); }, []);
+  const TYPES = [
+    { id: 'generic', name: 'No definido', icon: Target },
+    { id: 'boolean', name: 'Checklist', icon: CheckCircle2 },
+    { id: 'amount', name: 'Cantidad', icon: Hash },
+  ];
+
+  const fetchGoals = async () => {
+    if (!user) return;
+    const { data, error } = await supabase
+      .from("goals")
+      .select("*")
+      .order("priority", { ascending: false })
+      .order("created_at", { ascending: false });
+    
+    if (error) console.error(error);
+    else setGoals(data || []);
+  };
+
+  useEffect(() => { 
+    if (user) fetchGoals(); 
+  }, [user]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) return;
     setLoading(true);
     try {
-      await fetch(`${API_URL}/goals`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, type, target_date: targetDate, target_number: targetNumber ? parseFloat(targetNumber) : null, color })
-      });
+      const { error } = await supabase.from("goals").insert([{
+        user_id: user.id,
+        title,
+        description,
+        type,
+        priority,
+        target_date: dateType === 'specific' ? targetDate : null,
+        target_number: targetNumber ? parseFloat(targetNumber) : null,
+        color: PRIORITY_COLORS[priority]
+      }]);
+
+      if (error) throw error;
+      
       fetchGoals();
       setIsModalOpen(false);
       resetForm();
@@ -59,13 +91,22 @@ export default function GoalsView({ isDark }: { isDark: boolean }) {
     setLoading(false);
   };
 
-  const resetForm = () => { setTitle(""); setType("generic"); setTargetDate(""); setTargetNumber(""); setDateType("specific"); };
+  const resetForm = () => { 
+    setTitle(""); 
+    setDescription("");
+    setType("generic"); 
+    setPriority("low");
+    setTargetDate(""); 
+    setTargetNumber(""); 
+    setDateType("none"); 
+  };
 
-  const handleDelete = async (id: number, e: React.MouseEvent) => {
+  const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!confirm("¿Eliminar meta?")) return;
-    await fetch(`${API_URL}/goals/${id}`, { method: "DELETE" });
-    fetchGoals();
+    const { error } = await supabase.from("goals").delete().eq("id", id);
+    if (error) console.error(error);
+    else fetchGoals();
   };
 
   return (
@@ -73,53 +114,118 @@ export default function GoalsView({ isDark }: { isDark: boolean }) {
       <div className="flex items-center justify-between mb-12">
         <div>
           <h1 className={`text-4xl font-bold flex items-center gap-4 ${isDark ? 'text-white' : 'text-[#2A1D11]'}`}>
-            <Target className="text-orange-500 w-10 h-10" /> Objetivos y Metas
+            <Target className="text-accent w-10 h-10" /> Objetivos y Metas
           </h1>
           <p className={`mt-2 text-lg font-light ${isDark ? 'text-white/60' : 'text-black/40'}`}>Estructura tus ambiciones de forma clara.</p>
         </div>
-        <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 px-6 py-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold shadow-xl shadow-orange-500/20 transition-all active:scale-95"><Plus size={20} /> Nueva Meta</button>
+        <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 px-6 py-3 rounded-xl bg-accent hover:brightness-110 text-white font-bold shadow-xl transition-all active:scale-95"><Plus size={20} /> Nueva Meta</button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {goals.map((goal) => (
-          <div key={goal.id} onClick={() => navigate(`/goals/${goal.id}`)} className={`group cursor-pointer border rounded-2xl p-8 transition-all relative overflow-hidden backdrop-blur-3xl ${isDark ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-white/60 border-black/10 hover:bg-white/80'}`}>
-            <div className="flex items-start justify-between mb-6 relative z-10">
-              <div className={`p-4 rounded-xl ${goal.color.replace('bg-', 'bg-opacity-20 text-')} text-white`}>{goal.type === 'date_deadline' ? <CalendarIcon size={24} /> : goal.type === 'amount' ? <Hash size={24} /> : goal.type === 'boolean' ? <CheckCircle2 size={24} /> : <Target size={24} />}</div>
-              <button onClick={(e) => handleDelete(goal.id, e)} className={`p-2 rounded-lg transition-all opacity-0 group-hover:opacity-100 ${isDark ? 'text-red-500/60 hover:text-red-500' : 'text-red-600/60 hover:text-red-600'}`}><Trash2 size={18} /></button>
+        {goals.map((goal) => {
+          const colorMap: any = {
+            'bg-red-500': 'bg-red-500/20 text-red-500 border-red-500/20',
+            'bg-amber-500': 'bg-amber-500/20 text-amber-500 border-amber-500/20',
+            'bg-blue-500': 'bg-blue-500/20 text-blue-500 border-blue-500/20',
+          };
+          const colorClass = colorMap[goal.color] || 'bg-accent/20 text-accent border-accent/20';
+
+          return (
+            <div key={goal.id} onClick={() => navigate(`/goals/${goal.id}`)} className={`group cursor-pointer border rounded-2xl p-8 transition-all relative overflow-hidden backdrop-blur-3xl ${isDark ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-white/60 border-black/10 hover:bg-white/80'}`}>
+              <div className="flex items-start justify-between mb-6 relative z-10">
+                <div className={`px-4 py-2 rounded-full ${colorClass} font-bold text-[9px] uppercase tracking-widest border`}>
+                   {goal.priority === 'high' ? 'Alta Prioridad' : goal.priority === 'medium' ? 'Prioridad Media' : 'Prioridad Baja'}
+                </div>
+                <button onClick={(e) => handleDelete(goal.id, e)} className={`p-2 rounded-lg transition-all opacity-0 group-hover:opacity-100 ${isDark ? 'text-red-500/60 hover:text-red-500' : 'text-red-600/60 hover:text-red-600'}`}><Trash2 size={18} /></button>
+              </div>
+              <h3 className={`text-xl font-bold mb-2 font-sf ${isDark ? 'text-white' : 'text-[#2A1D11]'}`}>{goal.title}</h3>
+              <p className={`text-sm opacity-40 line-clamp-2 mb-6 ${isDark ? 'text-white' : 'text-black'}`}>{goal.description || "Sin descripción"}</p>
+              <div className={`pt-6 border-t flex items-center justify-between text-[11px] font-bold uppercase tracking-widest opacity-40 ${isDark ? 'border-white/5 text-white' : 'border-black/5 text-black'}`}>
+                 <span className="flex items-center gap-2"><CalendarIcon size={12} /> {goal.target_date || "Sin plazo"}</span>
+                 <ArrowRight size={14} className="text-accent" />
+              </div>
             </div>
-            <h3 className={`text-xl font-bold mb-6 font-sf ${isDark ? 'text-white' : 'text-[#2A1D11]'}`}>{goal.title}</h3>
-            <div className={`pt-6 border-t flex items-center justify-between text-[11px] font-bold uppercase tracking-widest opacity-40 ${isDark ? 'border-white/5 text-white' : 'border-black/5 text-black'}`}><span>{goal.target_date || "Sin plazo"}</span><ArrowRight size={14} className="text-orange-500" /></div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Nueva Meta" isDark={isDark}>
         <form onSubmit={handleCreate} className="space-y-6">
+          <style>{`
+            input[type=number]::-webkit-inner-spin-button, 
+            input[type=number]::-webkit-outer-spin-button { 
+              -webkit-appearance: none; 
+              margin: 0; 
+            }
+            input[type=number] {
+              -moz-appearance: textfield;
+            }
+          `}</style>
+
           <div>
             <label className={`text-[10px] uppercase font-bold tracking-widest ml-1 ${isDark ? 'text-white/40' : 'text-black/40'}`}>¿Qué quieres lograr?</label>
-            <input required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ej: Libertad financiera..." className={`w-full border rounded-xl px-5 py-4 mt-2 transition-colors ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-black/5 border-black/10 text-black'}`} />
+            <input required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ej: Libertad financiera..." className={`w-full border rounded-xl px-5 py-4 mt-2 transition-colors focus:border-accent outline-none ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-black/5 border-black/10 text-black'}`} />
           </div>
+
+          <div>
+            <label className={`text-[10px] uppercase font-bold tracking-widest ml-1 ${isDark ? 'text-white/40' : 'text-black/40'}`}>Descripción (Opcional)</label>
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Detalla tu objetivo..." rows={2} className={`w-full border rounded-xl px-5 py-4 mt-2 transition-colors resize-none focus:border-accent outline-none ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-black/5 border-black/10 text-black'}`} />
+          </div>
+
           <div className="space-y-4">
              <label className={`text-[10px] uppercase font-bold tracking-widest ml-1 ${isDark ? 'text-white/40' : 'text-black/40'}`}>Tipo de Medición</label>
-             <div className="grid grid-cols-2 gap-2">
+             <div className="grid grid-cols-3 gap-2">
                 {TYPES.map(t => (
-                   <button key={t.id} type="button" onClick={() => setType(t.id)} className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-all ${type === t.id ? 'bg-orange-500/20 border-orange-500' : isDark ? 'bg-white/5 border-white/5 text-white/40' : 'bg-black/5 border-black/5 text-black/40'}`}>
-                      <t.icon size={20} className={type === t.id ? 'text-orange-500' : ''} />
-                      <span className={`text-[10px] font-bold text-center ${isDark ? 'text-white/70' : 'text-black/70'}`}>{t.name}</span>
+                   <button key={t.id} type="button" onClick={() => setType(t.id)} className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-all ${type === t.id ? 'bg-accent/10 border-accent shadow-[0_0_15px_rgba(var(--accent-color-rgb),0.1)]' : isDark ? 'bg-white/5 border-white/5 text-white/40' : 'bg-black/5 border-black/5 text-black/40'}`}>
+                      <t.icon size={20} className={type === t.id ? 'text-accent' : ''} />
+                      <span className={`text-[9px] font-bold uppercase tracking-wider text-center ${type === t.id ? 'text-accent' : isDark ? 'text-white/30' : 'text-black/30'}`}>{t.name}</span>
                    </button>
                 ))}
              </div>
           </div>
-          <div className="space-y-4">
-             <label className={`text-[10px] uppercase font-bold tracking-widest ml-1 ${isDark ? 'text-white/40' : 'text-black/40'}`}>Plazo de Tiempo</label>
-             <div className="flex gap-2">
-                {['specific', 'month'].map(v => (
-                   <button key={v} type="button" onClick={() => setDateType(v)} className={`flex-1 py-3 rounded-xl text-[10px] font-bold uppercase border transition-all ${dateType === v ? 'bg-orange-500/10 border-orange-500 text-orange-500' : isDark ? 'bg-white/5 border-transparent text-white/30' : 'bg-black/5 border-transparent text-black/30'}`}>{v === 'specific' ? 'Fecha Exacta' : 'Mes Objetivo'}</button>
-                ))}
+
+          <div className="grid grid-cols-2 gap-6">
+             <div className="space-y-4">
+                <label className={`text-[10px] uppercase font-bold tracking-widest ml-1 ${isDark ? 'text-white/40' : 'text-black/40'}`}>Prioridad</label>
+                <div className="flex gap-2">
+                   {[
+                      { id: 'high', label: 'Alta', col: 'bg-red-500' },
+                      { id: 'medium', label: 'Media', col: 'bg-amber-500' },
+                      { id: 'low', label: 'Baja', col: 'bg-blue-500' }
+                   ].map(p => (
+                      <button key={p.id} type="button" onClick={() => setPriority(p.id)} className={`flex-1 py-3 rounded-xl text-[10px] font-bold uppercase border transition-all ${priority === p.id ? `${p.col} text-white border-transparent shadow-lg scale-105` : isDark ? 'bg-white/5 border-white/10 text-white/40' : 'bg-black/5 border-black/10 text-black/40'}`}>{p.label}</button>
+                   ))}
+                </div>
              </div>
-             {dateType === 'specific' ? <input type="date" required value={targetDate} onChange={(e) => setTargetDate(e.target.value)} className={`w-full border rounded-xl px-5 py-4 mt-2 ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-black/5 border-black/10 text-black'}`} /> : <input type="month" required value={targetDate} onChange={(e) => setTargetDate(e.target.value)} className={`w-full border rounded-xl px-5 py-4 mt-2 ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-black/5 border-black/10 text-black'}`} />}
+
+             <div className="space-y-4">
+                <label className={`text-[10px] uppercase font-bold tracking-widest ml-1 ${isDark ? 'text-white/40' : 'text-black/40'}`}>Plazo</label>
+                <div className="flex gap-2">
+                   {[
+                      { id: 'none', label: 'Sin Plazo' },
+                      { id: 'specific', label: 'Fecha' }
+                   ].map(v => (
+                      <button key={v.id} type="button" onClick={() => setDateType(v.id as any)} className={`flex-1 py-3 rounded-xl text-[10px] font-bold uppercase border transition-all ${dateType === v.id ? 'bg-accent text-white border-transparent shadow-lg scale-105' : isDark ? 'bg-white/5 border-white/10 text-white/30' : 'bg-black/5 border-black/10 text-black/30'}`}>{v.label}</button>
+                   ))}
+                </div>
+             </div>
           </div>
-          <button disabled={loading} className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-5 rounded-xl text-lg">Crear Meta</button>
+
+          {type === 'amount' && (
+             <div className="animate-in fade-in slide-in-from-top-2">
+                <label className={`text-[10px] uppercase font-bold tracking-widest ml-1 ${isDark ? 'text-white/40' : 'text-black/40'}`}>Número Objetivo</label>
+                <input type="number" required value={targetNumber} onChange={(e) => setTargetNumber(e.target.value)} placeholder="Ej: 5000" className={`w-full border rounded-xl px-5 py-4 mt-2 focus:border-accent outline-none transition-colors ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-black/5 border-black/10 text-black'}`} />
+             </div>
+          )}
+
+          {dateType === 'specific' && (
+             <div className="animate-in fade-in slide-in-from-top-2">
+                <label className={`text-[10px] uppercase font-bold tracking-widest ml-1 ${isDark ? 'text-white/40' : 'text-black/40'}`}>Fecha Límite</label>
+                <input type="date" required value={targetDate} onChange={(e) => setTargetDate(e.target.value)} className={`w-full border rounded-xl px-5 py-4 mt-2 focus:border-accent outline-none transition-colors ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-black/5 border-black/10 text-black'}`} />
+             </div>
+          )}
+
+          <button disabled={loading} className="w-full bg-accent hover:brightness-110 text-white font-bold py-5 rounded-xl text-lg shadow-[0_10px_20px_rgba(var(--accent-color-rgb),0.3)] transition-all active:scale-95">Crear Meta</button>
         </form>
       </Modal>
     </div>

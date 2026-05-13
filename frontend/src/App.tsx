@@ -107,6 +107,22 @@ const fontStyles = `
 `;
 
 import LandingPage from "./pages/LandingPage";
+import Auth from "./pages/Auth";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { Navigate } from "react-router-dom";
+
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+  if (loading) return null; // Or a loading spinner
+  if (!user) return <Navigate to="/auth" />;
+  return <>{children}</>;
+}
+
+function HomeRedirect() {
+  const { user, loading } = useAuth();
+  if (loading) return null;
+  return user ? <LandingPage /> : <Navigate to="/auth" />;
+}
 
 export default function App() {
   const [isDark, setIsDark] = useState(() => {
@@ -135,12 +151,17 @@ export default function App() {
   const toggleTheme = () => setIsDark(!isDark);
 
   return (
-    <>
+    <AuthProvider>
       <style>{fontStyles}</style>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route element={<Layout toggleTheme={toggleTheme} isDark={isDark} setAccentColor={setAccentColor} accentColor={accentColor} />}>
+          <Route path="/" element={<HomeRedirect />} />
+          <Route path="/auth" element={<Auth />} />
+          <Route element={
+            <ProtectedRoute>
+              <Layout toggleTheme={toggleTheme} isDark={isDark} setAccentColor={setAccentColor} accentColor={accentColor} />
+            </ProtectedRoute>
+          }>
             <Route path="/dashboard" element={<Dashboard isDark={isDark} />} />
             <Route path="/goals" element={<GoalsView isDark={isDark} />} />
             <Route path="/goals/:id" element={<GoalDetail isDark={isDark} />} />
@@ -151,6 +172,6 @@ export default function App() {
           </Route>
         </Routes>
       </BrowserRouter>
-    </>
+    </AuthProvider>
   );
 }

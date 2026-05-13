@@ -4,12 +4,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { Command, Search, ArrowRight, Sparkles } from "lucide-react";
 import MagneticText from "../components/MagneticText";
 
-const NATURE_IMAGES = [
-  "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&q=80&w=1920",
-  "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&q=80&w=1920",
-  "https://images.unsplash.com/photo-1501854140801-50d01698950b?auto=format&fit=crop&q=80&w=1920",
-  "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&q=80&w=1920",
-];
+import { NATURE_IMAGES, VERSES } from "../constants/assets";
 
 const COMMANDS: Record<string, string> = {
   "dashboard": "/dashboard",
@@ -21,15 +16,6 @@ const COMMANDS: Record<string, string> = {
   "notas": "/journal",
   "calendario": "/calendar",
 };
-
-const VERSES = [
-  { text: "Camina por fe, no por vista.", author: "2 Corintios 5:7" },
-  { text: "Todo lo puedo en Cristo que me fortalece.", author: "Filipenses 4:13" },
-  { text: "El Señor es mi pastor, nada me faltará.", author: "Salmo 23:1" },
-  { text: "No temas, porque yo estoy contigo.", author: "Isaías 41:10" },
-  { text: "Confía en el Señor de todo corazón.", author: "Proverbios 3:5" },
-  { text: "El amor todo lo sufre, todo lo cree, todo lo espera.", author: "1 Corintios 13:7" }
-];
 
 export default function LandingPage() {
   const [input, setInput] = useState("");

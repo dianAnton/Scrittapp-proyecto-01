@@ -2,8 +2,8 @@ import { useState, useEffect } from "react";
 import { Calendar, ChevronLeft, ChevronRight, Target, ArrowRight, Zap } from "lucide-react";
 import { motion } from "motion/react";
 import { useNavigate } from "react-router-dom";
-
-const API_URL = "http://localhost:3001/api";
+import { supabase } from "../lib/supabaseClient";
+import { useAuth } from "../contexts/AuthContext";
 
 const getLocalDateString = (d: Date) => {
   const offset = d.getTimezoneOffset() * 60000;
@@ -17,6 +17,7 @@ export default function Dashboard({ isDark }: { isDark: boolean }) {
   const [logs, setLogs] = useState<any[]>([]);
   const [offsetDays, setOffsetDays] = useState(0);
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const daysCount = 14;
   const today = new Date();
@@ -29,45 +30,58 @@ export default function Dashboard({ isDark }: { isDark: boolean }) {
   });
 
   const fetchData = async () => {
+    if (!user) return;
     try {
       const [hRes, gRes, lRes] = await Promise.all([
-        fetch(`${API_URL}/habits`),
-        fetch(`${API_URL}/goals`),
-        fetch(`${API_URL}/habit_logs`)
+        supabase.from("habits").select("*"),
+        supabase.from("goals").select("*").order("created_at", { ascending: false }),
+        supabase.from("habit_logs").select("*")
       ]);
-      setHabits(await hRes.json());
-      setGoals(await gRes.json());
-      setLogs(await lRes.json());
+      
+      if (hRes.data) setHabits(hRes.data);
+      if (gRes.data) setGoals(gRes.data);
+      if (lRes.data) setLogs(lRes.data);
     } catch (e) { console.error(e); }
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { 
+    if (user) fetchData(); 
+  }, [user]);
 
   const logsMap = logs.reduce((acc: any, log: any) => {
     acc[`${log.habit_id}-${log.date}`] = !!log.completed;
     return acc;
   }, {});
 
-  const toggleHabit = async (habitId: number, date: string) => {
+  const toggleHabit = async (habitId: string, date: string) => {
+    if (!user) return;
     const isCompleted = logsMap[`${habitId}-${date}`];
+    const habit = habits.find(h => h.id === habitId);
+    
     try {
-      await fetch(`${API_URL}/habit_logs/toggle`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ habit_id: habitId, date, completed: !isCompleted })
-      });
+      const { error } = await supabase
+        .from("habit_logs")
+        .upsert({
+          user_id: user.id,
+          habit_id: habitId,
+          date,
+          completed: !isCompleted,
+          value: !isCompleted ? (habit?.target_value || 1) : 0
+        }, { onConflict: 'habit_id, date' });
+
+      if (error) throw error;
       fetchData();
     } catch (e) { console.error(e); }
   };
 
-  const getStreakAtDate = (habitId: number, dateStr: string) => {
+  const getStreakAtDate = (habitId: string, dateStr: string) => {
     let streak = 0;
     const d = new Date(dateStr + "T00:00:00");
     while (logsMap[`${habitId}-${getLocalDateString(d)}`]) { streak++; d.setDate(d.getDate() - 1); }
     return streak;
   };
 
-  const getCellStyle = (habitId: number, date: string) => {
+  const getCellStyle = (habitId: string, date: string) => {
     const isCompleted = logsMap[`${habitId}-${date}`];
     if (!isCompleted) return isDark ? "bg-white/5" : "bg-black/5";
     
@@ -81,7 +95,7 @@ export default function Dashboard({ isDark }: { isDark: boolean }) {
     return `${colorClasses[color] || 'bg-accent'} ${opacity}`;
   };
 
-  const calculateStats = (habitId: number) => {
+  const calculateStats = (habitId: string) => {
     let current = 0, longest = 0, total = logs.filter(l => l.habit_id === habitId && l.completed).length;
     let d = new Date();
     while (logsMap[`${habitId}-${getLocalDateString(d)}`]) { current++; d.setDate(d.getDate() - 1); }
@@ -95,29 +109,58 @@ export default function Dashboard({ isDark }: { isDark: boolean }) {
     return { current, longest, total };
   };
 
+  const calculateGoalProgress = (goal: any) => {
+    const goalHabits = habits.filter(h => h.goal_id === goal.id);
+    const habitIds = goalHabits.map(h => h.id);
+    const goalLogs = logs.filter(l => habitIds.includes(l.habit_id) && l.completed);
+    
+    if (goal.type === 'amount' && goal.target_number) {
+      const totalAmount = goalLogs.reduce((acc, curr) => acc + (curr.value || 0), 0);
+      return Math.min(100, Math.round((totalAmount / goal.target_number) * 100));
+    }
+    return Math.min(100, goalLogs.length * 5);
+  };
+
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-8 font-inter">
       <div className={`backdrop-blur-3xl border rounded-2xl p-10 transition-all ${isDark ? 'bg-white/5 border-white/10' : 'bg-white/60 border-black/10 shadow-xl'}`}>
          <div className="flex items-center justify-between mb-8">
-            <h2 className={`text-2xl font-bold flex items-center gap-3 font-sf ${isDark ? 'text-white' : 'text-[#2A1D11]'}`}><Target className="text-accent" /> Metas Prioritarias</h2>
+            <h2 className={`text-2xl font-bold flex items-center gap-3 font-sf ${isDark ? 'text-white' : 'text-[#2A1D11]'}`}><Target className="text-accent" /> Metas y Objetivos</h2>
             <button onClick={() => navigate('/goals')} className="text-accent font-bold text-sm hover:underline flex items-center gap-2">Ver todas <ArrowRight size={16} /></button>
          </div>
-         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {goals.slice(0, 2).map(goal => (
-               <div key={goal.id} onClick={() => navigate(`/goals/${goal.id}`)} className={`p-6 rounded-2xl border flex items-center gap-6 hover:scale-[1.02] transition-all cursor-pointer group ${isDark ? 'bg-black/20 border-white/5' : 'bg-black/5 border-black/5'}`}>
-                  <div className={`p-4 rounded-xl ${goal.color.replace('bg-', 'bg-opacity-20 text-')} text-white`}>{goal.type === 'date_deadline' ? <Calendar size={24} /> : <Target size={24} />}</div>
-                  <div className="flex-1">
-                     <p className={`font-bold mb-2 ${isDark ? 'text-white' : 'text-[#2A1D11]'}`}>{goal.title}</p>
-                     <div className="w-full h-1.5 bg-black/5 rounded-full overflow-hidden"><div className={`h-full ${goal.color} rounded-full`} style={{ width: '40%' }} /></div>
+         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {goals.map(goal => {
+               const progress = calculateGoalProgress(goal);
+               return (
+                  <div key={goal.id} onClick={() => navigate(`/goals/${goal.id}`)} className={`p-6 rounded-2xl border flex items-center gap-6 hover:scale-[1.02] transition-all cursor-pointer group ${isDark ? 'bg-black/20 border-white/5' : 'bg-black/5 border-black/5'}`}>
+                     <div className={`p-4 rounded-xl ${goal.color?.replace('bg-', 'bg-opacity-20 text-') || 'bg-accent/20 text-accent'} text-white`}>
+                        {goal.type === 'amount' ? <Zap size={20} /> : <Target size={20} />}
+                     </div>
+                     <div className="flex-1">
+                        <div className="flex items-center justify-between mb-1">
+                           <div className="flex items-center gap-2 truncate">
+                              <div className={`w-1.5 h-1.5 rounded-full ${goal.color || 'bg-accent'}`} />
+                              <p className={`font-bold text-sm truncate ${isDark ? 'text-white' : 'text-[#2A1D11]'}`}>{goal.title}</p>
+                           </div>
+                           <span className="text-[10px] font-bold opacity-30">{progress}%</span>
+                        </div>
+                        <div className="w-full h-1 bg-black/5 rounded-full overflow-hidden">
+                           <motion.div 
+                              initial={{ width: 0 }}
+                              animate={{ width: `${progress}%` }}
+                              className={`h-full ${goal.color || 'bg-accent'} rounded-full`} 
+                           />
+                        </div>
+                     </div>
                   </div>
-               </div>
-            ))}
+               );
+            })}
          </div>
       </div>
 
       <div className={`backdrop-blur-3xl border rounded-2xl p-10 shadow-2xl transition-all ${isDark ? 'bg-white/5 border-white/10' : 'bg-white/60 border-black/10 shadow-xl'}`}>
         <div className="flex items-center justify-between mb-10">
-          <h2 className={`text-2xl font-bold flex items-center gap-3 font-sf ${isDark ? 'text-white' : 'text-[#2A1D11]'}`}><Zap className="text-emerald-500" /> Hábitos Diarios</h2>
+          <h2 className={`text-2xl font-bold flex items-center gap-3 font-sf ${isDark ? 'text-white' : 'text-[#2A1D11]'}`}><Zap className="text-accent" /> Hábitos Diarios</h2>
           <div className="flex items-center gap-4 bg-black/5 p-1 rounded-xl border border-black/5">
              <button onClick={() => setOffsetDays(offsetDays + 7)} className={`p-2 rounded-lg transition-all ${isDark ? 'text-white/40 hover:text-white hover:bg-white/10' : 'text-black/40 hover:text-black hover:bg-black/10'}`}><ChevronLeft size={18} /></button>
              <button onClick={() => setOffsetDays(Math.max(0, offsetDays - 7))} disabled={offsetDays === 0} className={`p-2 rounded-lg transition-all disabled:opacity-10 ${isDark ? 'text-white/40 hover:text-white hover:bg-white/10' : 'text-black/40 hover:text-black hover:bg-black/10'}`}><ChevronRight size={18} /></button>

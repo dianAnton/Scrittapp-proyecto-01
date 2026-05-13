@@ -1,8 +1,9 @@
 import { motion } from "motion/react";
 import { useState, useEffect } from "react";
 import { User, Activity, Sparkles } from "lucide-react";
-
-const API_URL = "http://localhost:3001/api";
+import { NATURE_IMAGES, VERSES } from "../constants/assets";
+import { useAuth } from "../contexts/AuthContext";
+import { supabase } from "../lib/supabaseClient";
 
 const textContainer = {
   hidden: { opacity: 0 },
@@ -30,28 +31,12 @@ function AnimatedLine({ line }: { line: string }) {
   );
 }
 
-const VERSES = [
-  { text: "Camina por fe, no por vista.", author: "2 Corintios 5:7" },
-  { text: "Todo lo puedo en Cristo que me fortalece.", author: "Filipenses 4:13" },
-  { text: "El Señor es mi pastor, nada me faltará.", author: "Salmo 23:1" },
-  { text: "No temas, porque yo estoy contigo.", author: "Isaías 41:10" },
-  { text: "Confía en el Señor de todo corazón.", author: "Proverbios 3:5" },
-  { text: "El amor todo lo sufre, todo lo cree, todo lo espera.", author: "1 Corintios 13:7" }
-];
-
-const NATURE_IMAGES = [
-  "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&q=80&w=1920",
-  "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&q=80&w=1920",
-  "https://images.unsplash.com/photo-1501854140801-50d01698950b?auto=format&fit=crop&q=80&w=1920",
-  "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&q=80&w=1920",
-];
-
 export default function HeroSection() {
   const [verseIndex, setVerseIndex] = useState(0);
   const [imageIndex, setImageIndex] = useState(0);
   const [customImage, setCustomImage] = useState(() => localStorage.getItem("hero-custom-image") || "");
   const [streak, setStreak] = useState(0);
-  const [userName] = useState("Diego");
+  const { user, profile } = useAuth();
 
   useEffect(() => {
     const dayOfYear = Math.floor(Date.now() / 86400000);
@@ -59,10 +44,33 @@ export default function HeroSection() {
     const hour = new Date().getHours();
     setImageIndex(Math.floor(hour / 6) % NATURE_IMAGES.length);
 
-    fetch(`${API_URL}/stats/streak`)
-      .then(r => r.json())
-      .then(data => setStreak(data.streak))
-      .catch(console.error);
+    const calculateStreak = async () => {
+      if (!user) return;
+      
+      const { data: logs } = await supabase
+        .from("habit_logs")
+        .select("date")
+        .eq("completed", true)
+        .order("date", { ascending: false });
+
+      if (logs && logs.length > 0) {
+        const uniqueDates = Array.from(new Set(logs.map(l => l.date)));
+        let currentStreak = 0;
+        const dateStr = (d: Date) => d.toISOString().split('T')[0];
+        
+        let checkDate = new Date();
+        // Check if there's a log today or yesterday to continue streak
+        if (uniqueDates.includes(dateStr(checkDate)) || uniqueDates.includes(dateStr(new Date(Date.now() - 86400000)))) {
+          while (uniqueDates.includes(dateStr(checkDate))) {
+            currentStreak++;
+            checkDate.setDate(checkDate.getDate() - 1);
+          }
+        }
+        setStreak(currentStreak);
+      }
+    };
+
+    calculateStreak();
 
     const handleStorage = () => setCustomImage(localStorage.getItem("hero-custom-image") || "");
     window.addEventListener('storage', handleStorage);
@@ -136,7 +144,7 @@ export default function HeroSection() {
         {/* USER PROFILE BADGE (Integrated) */}
         <div className="absolute top-10 right-10 z-20 flex items-center gap-4 group">
            <div className="flex flex-col items-end leading-none">
-              <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">{userName}</span>
+              <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">{profile?.username || "Usuario"}</span>
               <div className="flex items-center gap-2 text-white">
                  <Activity size={12} className="text-accent" />
                  <span className="text-sm font-bold tracking-tight">{streak} DÍAS ACTIVO</span>
@@ -169,7 +177,7 @@ export default function HeroSection() {
             
             <div className="flex items-center gap-4 pt-2">
                <div className="h-[1px] w-12 bg-accent" />
-               <span className="text-accent font-bold text-xs uppercase tracking-widest">Bienvenido, {userName}</span>
+               <span className="text-accent font-bold text-xs uppercase tracking-widest">Bienvenido, {profile?.username || "Usuario"}</span>
             </div>
           </motion.div>
         </div>

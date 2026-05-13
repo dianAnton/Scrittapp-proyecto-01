@@ -3,8 +3,7 @@ import { useState, useEffect } from "react";
 import { Calendar, ArrowLeft, Zap, Clock, CalendarDays, LineChart as LineChartIcon, Target, TrendingUp, Info, Hash } from "lucide-react";
 import { motion } from "motion/react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
-
-const API_URL = "http://localhost:3001/api";
+import { supabase } from "../lib/supabaseClient";
 
 const getLocalDateString = (d: Date) => {
   const offset = d.getTimezoneOffset() * 60000;
@@ -16,17 +15,52 @@ export default function HabitDetail({ isDark }: { isDark: boolean }) {
   const { id } = useParams();
   const navigate = useNavigate();
   const [habit, setHabit] = useState<any>(null);
+  const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [heatmapView, setHeatmapView] = useState<'annual' | 'monthly'>('annual');
 
   useEffect(() => {
-    fetch(`${API_URL}/habits/${id}`).then(r => r.json()).then(data => { setHabit(data); setLoading(false); }).catch(console.error);
+    const fetchHabitDetail = async () => {
+      if (!id) return;
+      
+      const { data: habitData, error: habitError } = await supabase
+        .from("habits")
+        .select(`
+          *,
+          goals (title)
+        `)
+        .eq("id", id)
+        .single();
+      
+      if (habitError) {
+        console.error(habitError);
+        setLoading(false);
+        return;
+      }
+
+      const { data: logsData } = await supabase
+        .from("habit_logs")
+        .select("*")
+        .eq("habit_id", id);
+      
+      // Map goals title back to habit for compatibility with existing UI
+      const habitWithGoal = {
+        ...habitData,
+        goal_title: habitData.goals?.title
+      };
+      
+      setHabit(habitWithGoal);
+      setLogs(logsData || []);
+      setLoading(false);
+    };
+
+    fetchHabitDetail();
   }, [id]);
 
   if (loading) return <div className="p-20 text-center opacity-20">Cargando estadísticas...</div>;
   if (!habit) return <div className="p-20 text-center">Hábito no encontrado.</div>;
 
-  const logsMap = habit.logs.reduce((acc: any, log: any) => { acc[log.date] = log; return acc; }, {});
+  const logsMap = logs.reduce((acc: any, log: any) => { acc[log.date] = log; return acc; }, {});
 
   const today = new Date();
   const daysToShow = heatmapView === 'annual' ? 365 : 30;
@@ -54,8 +88,8 @@ export default function HabitDetail({ isDark }: { isDark: boolean }) {
      };
   });
 
-  const totalCompletions = habit.logs.filter((l: any) => l.completed).length;
-  const averageValue = habit.measure_type !== 'boolean' ? (habit.logs.reduce((acc: any, l: any) => acc + (l.value || 0), 0) / (habit.logs.length || 1)).toFixed(1) : null;
+  const totalCompletions = logs.filter((l: any) => l.completed).length;
+  const averageValue = habit.measure_type !== 'boolean' ? (logs.reduce((acc: any, l: any) => acc + (l.value || 0), 0) / (logs.length || 1)).toFixed(1) : null;
 
   return (
     <div className="p-8 max-w-7xl mx-auto font-inter space-y-10">

@@ -2,12 +2,13 @@ import { useState, useEffect, useRef } from "react";
 import { FileText, ChevronDown, Plus, Bold, Italic, Type, Download, Folder, Trash2 } from "lucide-react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import Modal from "../components/Modal";
-
-const API_URL = "http://localhost:3001/api";
+import { supabase } from "../lib/supabaseClient";
+import { useAuth } from "../contexts/AuthContext";
 
 export default function JournalView({ isDark }: { isDark: boolean }) {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const dateParam = searchParams.get("date");
   const todayStr = new Date().toISOString().split('T')[0];
   const activeDate = dateParam || todayStr;
@@ -26,46 +27,77 @@ export default function JournalView({ isDark }: { isDark: boolean }) {
   const [newNoteDate, setNewNoteDate] = useState(todayStr);
   const [newNoteTitle, setNewNoteTitle] = useState("");
 
+  const fetchHistory = async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from("notes")
+      .select("id, title, date")
+      .order("date", { ascending: false });
+    setHistory(data || []);
+  };
+
   useEffect(() => {
-    fetch(`${API_URL}/notes?date=${activeDate}`)
-      .then(r => r.json())
-      .then(data => {
+    if (!user) return;
+
+    const fetchNote = async () => {
+      const { data, error } = await supabase
+        .from("notes")
+        .select("*")
+        .eq("date", activeDate)
+        .single();
+      
+      if (data) {
         setTitle(data.title || activeDate);
         if (editorRef.current) {
           editorRef.current.innerHTML = data.content || "";
         }
-      })
-      .catch(console.error);
+      } else {
+        setTitle(activeDate);
+        if (editorRef.current) editorRef.current.innerHTML = "";
+      }
+    };
 
-    fetch(`${API_URL}/notes`)
-      .then(r => r.json())
-      .then(data => setHistory(data))
-      .catch(console.error);
-  }, [activeDate]);
+    fetchNote();
+    fetchHistory();
+  }, [activeDate, user]);
 
   const handleSave = async () => {
-    if (!editorRef.current) return;
-    try {
-      await fetch(`${API_URL}/notes`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date: activeDate, content: editorRef.current.innerHTML, title })
-      });
-      fetch(`${API_URL}/notes`).then(r => r.json()).then(setHistory);
-    } catch (e) { console.error(e); }
+    if (!editorRef.current || !user) return;
+    
+    const content = editorRef.current.innerHTML;
+    
+    const { error } = await supabase
+      .from("notes")
+      .upsert({ 
+        user_id: user.id, 
+        date: activeDate, 
+        content, 
+        title: title || activeDate 
+      }, { onConflict: 'user_id, date' });
+
+    if (error) console.error(error);
+    else fetchHistory();
   };
 
   const createNewNote = async (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-       await fetch(`${API_URL}/notes`, {
-         method: "POST",
-         headers: { "Content-Type": "application/json" },
-         body: JSON.stringify({ date: newNoteDate, content: "", title: newNoteTitle || newNoteDate })
-       });
+    if (!user) return;
+    
+    const { error } = await supabase
+      .from("notes")
+      .insert([{ 
+        user_id: user.id, 
+        date: newNoteDate, 
+        content: "", 
+        title: newNoteTitle || newNoteDate 
+      }]);
+
+    if (!error) {
        setIsNewNoteModalOpen(false);
        navigate(`/journal?date=${newNoteDate}`);
-    } catch (e) { console.error(e); }
+    } else {
+      console.error(error);
+    }
   };
 
   const handleSelection = () => {
@@ -94,14 +126,14 @@ export default function JournalView({ isDark }: { isDark: boolean }) {
       <div className={`transition-all duration-300 border-r flex flex-col vault-sidebar ${isVaultOpen ? 'w-64' : 'w-0'} ${isDark ? 'bg-[#161616] border-white/5' : 'bg-[#F5F4E8] border-black/5'}`}>
         <div className="p-4 flex items-center justify-between border-b border-white/5">
           <span className={`text-[10px] font-bold opacity-40 uppercase tracking-widest flex items-center gap-2 ${isDark ? 'text-white' : 'text-black'}`}>
-            <Folder size={12} className="text-orange-500/50" /> Vault
+            <Folder size={12} className="text-accent/50" /> Vault
           </span>
-          <button onClick={() => setIsNewNoteModalOpen(true)} className="p-1 hover:bg-black/5 rounded text-orange-500"><Plus size={16} /></button>
+          <button onClick={() => setIsNewNoteModalOpen(true)} className="p-1 hover:bg-black/5 rounded text-accent"><Plus size={16} /></button>
         </div>
         <div className="flex-1 overflow-y-auto p-2 space-y-1">
            {history.map(item => (
-             <a key={item.date} href={`/journal?date=${item.date}`} className={`flex items-center gap-2 px-3 py-2 text-[13px] rounded-md transition-all ${item.date === activeDate ? 'bg-orange-500/10 text-orange-600 font-bold' : 'opacity-40 hover:bg-black/5 hover:opacity-80'}`}>
-               <FileText size={12} className={item.date === activeDate ? 'text-orange-500' : 'opacity-20'} />
+             <a key={item.date} href={`/journal?date=${item.date}`} className={`flex items-center gap-2 px-3 py-2 text-[13px] rounded-md transition-all ${item.date === activeDate ? 'bg-accent/10 text-accent font-bold' : 'opacity-40 hover:bg-black/5 hover:opacity-80'}`}>
+               <FileText size={12} className={item.date === activeDate ? 'text-accent' : 'opacity-20'} />
                <span className="truncate">{item.title || item.date}</span>
              </a>
            ))}
@@ -112,7 +144,7 @@ export default function JournalView({ isDark }: { isDark: boolean }) {
       <div className="flex-1 flex flex-col min-w-0 editor-main relative">
         {/* TAB BAR */}
         <div className={`h-12 border-b flex items-center px-4 justify-between ${isDark ? 'bg-[#161616] border-white/5' : 'bg-[#F5F4E8] border-black/5'} print:hidden`}>
-           <div className={`h-full border-r px-4 flex items-center gap-2 text-[12px] font-bold border-t-2 border-t-orange-500 ${isDark ? 'bg-[#0d0d0d] text-orange-400 border-white/5' : 'bg-[#FDFCF0] text-orange-600 border-black/5'}`}>
+           <div className={`h-full border-r px-4 flex items-center gap-2 text-[12px] font-bold border-t-2 border-t-accent ${isDark ? 'bg-[#0d0d0d] text-accent border-white/5' : 'bg-[#FDFCF0] text-accent border-black/5'}`}>
               <FileText size={12} /> {title}.note
            </div>
            <div className="flex items-center gap-3">
@@ -166,7 +198,7 @@ export default function JournalView({ isDark }: { isDark: boolean }) {
                <label className="text-[10px] uppercase font-bold opacity-40 tracking-widest ml-1">Título</label>
                <input value={newNoteTitle} onChange={(e) => setNewNoteTitle(e.target.value)} placeholder="Título opcional..." className={`w-full border rounded-xl px-5 py-4 mt-2 ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-black/5 border-black/10 text-black'}`} />
             </div>
-            <button className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-5 rounded-xl text-lg">Crear Nota</button>
+            <button className="w-full bg-accent hover:brightness-110 text-white font-bold py-5 rounded-xl text-lg shadow-xl">Crear Nota</button>
          </form>
       </Modal>
 

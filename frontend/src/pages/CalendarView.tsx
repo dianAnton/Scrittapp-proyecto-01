@@ -66,9 +66,9 @@ export default function CalendarView({ isDark }: { isDark: boolean }) {
             const isToday = dateStr === getLocalDateString(new Date());
             return (
               <div key={day} onClick={() => { setCurrentDate(new Date(dateStr + "T00:00:00")); setView('day'); }} className={`h-24 border-b border-r p-2 flex flex-col gap-1 hover:bg-black/[0.03] transition-all cursor-pointer group ${isDark ? 'border-white/5' : 'border-black/5'}`}>
-                <span className={`text-xs font-bold ${isToday ? 'bg-orange-500 text-white w-6 h-6 flex items-center justify-center rounded-lg shadow-lg' : 'opacity-40 group-hover:opacity-80'}`}>{day}</span>
+                <span className={`text-xs font-bold ${isToday ? 'bg-accent text-white w-6 h-6 flex items-center justify-center rounded-lg shadow-lg' : 'opacity-40 group-hover:opacity-80'}`}>{day}</span>
                 <div className="flex flex-wrap gap-1">
-                  {dayLogs.map(l => <div key={l.id} className="w-1.5 h-1.5 rounded-full bg-emerald-500" />)}
+                  {dayLogs.map(l => <div key={l.id} className="w-1.5 h-1.5 rounded-full bg-accent" />)}
                 </div>
               </div>
             );
@@ -95,14 +95,14 @@ export default function CalendarView({ isDark }: { isDark: boolean }) {
           const isToday = dateStr === getLocalDateString(new Date());
 
           return (
-            <div key={dateStr} onClick={() => { setCurrentDate(d); setView('day'); }} className={`border rounded-2xl p-6 flex flex-col gap-4 hover:scale-[1.02] transition-all cursor-pointer group ${isDark ? 'bg-white/5 border-white/10' : 'bg-black/[0.02] border-black/10'} ${isToday ? 'ring-2 ring-orange-500' : ''}`}>
+            <div key={dateStr} onClick={() => { setCurrentDate(d); setView('day'); }} className={`border rounded-2xl p-6 flex flex-col gap-4 hover:scale-[1.02] transition-all cursor-pointer group ${isDark ? 'bg-white/5 border-white/10' : 'bg-black/[0.02] border-black/10'} ${isToday ? 'ring-2 ring-accent' : ''}`}>
               <div className="text-center border-b border-black/5 pb-4">
                  <p className="text-[10px] uppercase font-bold opacity-30 tracking-widest">{DAY_NAMES[d.getDay()]}</p>
-                 <p className={`text-2xl font-bold ${isToday ? 'text-orange-500' : 'opacity-80'}`}>{d.getDate()}</p>
+                 <p className={`text-2xl font-bold ${isToday ? 'text-accent' : 'opacity-80'}`}>{d.getDate()}</p>
               </div>
               <div className="flex-1 space-y-3">
                  <div className="flex flex-wrap gap-1.5">
-                    {dayLogs.map(l => <div key={l.id} className="w-2.5 h-2.5 rounded-sm bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.3)]" />)}
+                    {dayLogs.map(l => <div key={l.id} className="w-2.5 h-2.5 rounded-sm bg-accent shadow-[0_0_8px_rgba(var(--accent-color-rgb),0.3)]" />)}
                  </div>
               </div>
             </div>
@@ -119,7 +119,7 @@ export default function CalendarView({ isDark }: { isDark: boolean }) {
       <div className={`border rounded-2xl p-12 flex flex-col md:flex-row gap-12 ${isDark ? 'bg-white/5 border-white/10' : 'bg-black/[0.02] border-black/10'}`}>
         <div className="flex-1">
           <h2 className="text-5xl font-bold mb-6 font-sf capitalize">{currentDate.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}</h2>
-          <button onClick={() => navigate(`/journal?date=${dateStr}`)} className="flex items-center gap-2 bg-orange-500 text-white px-8 py-4 rounded-xl font-bold hover:bg-orange-600 transition-all shadow-xl shadow-orange-500/30"><BookOpen size={20} /> Diario del día</button>
+          <button onClick={() => navigate(`/journal?date=${dateStr}`)} className="flex items-center gap-2 bg-accent text-white px-8 py-4 rounded-xl font-bold hover:brightness-110 transition-all shadow-xl"><BookOpen size={20} /> Diario del día</button>
         </div>
         <div className="w-full md:w-80 space-y-4">
            <div className={`p-6 rounded-2xl border ${isDark ? 'bg-black/30 border-white/5' : 'bg-white border-black/5'}`}>
@@ -127,7 +127,7 @@ export default function CalendarView({ isDark }: { isDark: boolean }) {
               <div className="space-y-3">
                  {dayLogs.map(l => {
                     const h = habits.find(h => h.id === l.habit_id);
-                    return <div key={l.id} className="flex items-center gap-3 font-bold text-sm"><CheckCircle2 size={16} className="text-emerald-500" /> {h?.title}</div>;
+                    return <div key={l.id} className="flex items-center gap-3 font-bold text-sm"><CheckCircle2 size={16} className="text-accent" /> {h?.title}</div>;
                  })}
                  {dayLogs.length === 0 && <p className="opacity-10 italic text-sm">Sin actividad.</p>}
               </div>
@@ -141,7 +141,7 @@ export default function CalendarView({ isDark }: { isDark: boolean }) {
     <div className="p-8 max-w-7xl mx-auto font-inter space-y-10">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
         <h1 className="text-4xl font-bold flex items-center gap-4">
-          <CalendarIcon className="text-purple-500 w-10 h-10" /> Calendario
+          <CalendarIcon className="text-accent w-10 h-10" /> Calendario
         </h1>
         <div className="flex items-center gap-4 bg-black/5 p-1.5 rounded-xl border border-black/5">
           <button onClick={prev} className="p-2 hover:bg-black/5 rounded-lg transition-colors"><ChevronLeft size={20} /></button>
@@ -151,7 +151,7 @@ export default function CalendarView({ isDark }: { isDark: boolean }) {
           <button onClick={next} className="p-2 hover:bg-black/5 rounded-lg transition-colors"><ChevronRight size={20} /></button>
           <div className="h-6 w-[1px] bg-black/10 mx-2" />
           {['month', 'week', 'day'].map(v => (
-             <button key={v} onClick={() => setView(v as any)} className={`px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${view === v ? 'bg-purple-500 text-white shadow-lg' : 'opacity-40 hover:opacity-80'}`}>{v === 'month' ? 'Mes' : v === 'week' ? 'Sem' : 'Día'}</button>
+             <button key={v} onClick={() => setView(v as any)} className={`px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${view === v ? 'bg-accent text-white shadow-lg' : 'opacity-40 hover:opacity-80'}`}>{v === 'month' ? 'Mes' : v === 'week' ? 'Sem' : 'Día'}</button>
           ))}
         </div>
       </div>

@@ -10,10 +10,11 @@ import {
   UserSearch,
   GraduationCap
 } from "lucide-react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import Modal from "./Modal";
+import { useAuth } from "../contexts/AuthContext";
 
 interface SidebarProps {
   toggleTheme: () => void;
@@ -24,9 +25,15 @@ interface SidebarProps {
 
 const ACCENT_PRESETS = [
   { name: "Naranja", hex: "#F97316" },
+  { name: "Ámbar", hex: "#F59E0B" },
+  { name: "Lima", hex: "#84CC16" },
   { name: "Esmeralda", hex: "#10B981" },
+  { name: "Teal", hex: "#14B8A6" },
+  { name: "Cian", hex: "#06B6D4" },
   { name: "Azul", hex: "#3B82F6" },
+  { name: "Índigo", hex: "#6366F1" },
   { name: "Púrpura", hex: "#8B5CF6" },
+  { name: "Fucsia", hex: "#D946EF" },
   { name: "Rosa", hex: "#EC4899" },
   { name: "Rojo", hex: "#EF4444" },
 ];
@@ -47,6 +54,7 @@ const staggerVariants = {
 };
 
 export default function Sidebar({ toggleTheme, isDark, setAccentColor, accentColor }: SidebarProps) {
+  const { profile, signOut } = useAuth();
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -54,6 +62,7 @@ export default function Sidebar({ toggleTheme, isDark, setAccentColor, accentCol
   const [customImage, setCustomImage] = useState(() => localStorage.getItem("hero-custom-image") || "");
   
   const location = useLocation();
+  const navigate = useNavigate();
 
   const menuItems = [
     { name: "Inicio", path: "/", icon: Home },
@@ -134,27 +143,56 @@ export default function Sidebar({ toggleTheme, isDark, setAccentColor, accentCol
           <div className={`p-3 space-y-2 border-t ${themeColors.border}`}>
             <button 
               onClick={() => setIsGlobalModalOpen(true)}
-              className={`w-full flex items-center justify-center gap-3 p-3 rounded-xl bg-accent text-white transition-all shadow-lg hover:brightness-110 active:scale-95 ${isCollapsed ? 'px-0' : ''}`}
+              className={`w-full flex items-center gap-3 p-3 rounded-xl bg-accent text-white transition-all shadow-lg hover:brightness-110 active:scale-95 ${isCollapsed ? 'justify-center px-0' : ''}`}
               style={{ backgroundColor: accentColor, boxShadow: `0 10px 20px -5px ${accentColor}40` }}
             >
               <Plus size={20} className="shrink-0" />
-              {!isCollapsed && <span className="text-[11px] font-bold uppercase tracking-widest whitespace-nowrap">Acceso Rápido</span>}
+              <AnimatePresence>
+                {!isCollapsed && (
+                  <motion.span 
+                    variants={itemVariants}
+                    className="text-[11px] font-bold uppercase tracking-widest whitespace-nowrap"
+                  >
+                    Acceso Rápido
+                  </motion.span>
+                )}
+              </AnimatePresence>
             </button>
 
             <button 
               onClick={toggleTheme}
               className={`w-full flex items-center gap-3 p-2.5 rounded-xl transition-all ${themeColors.text} ${themeColors.hover} ${isCollapsed ? 'justify-center' : ''}`}
             >
-              {isDark ? <Sun size={20} /> : <Moon size={20} />}
-              {!isCollapsed && <span className="text-[13px] font-medium whitespace-nowrap">{isDark ? "Modo Claro" : "Modo Oscuro"}</span>}
+              <div className="shrink-0">
+                {isDark ? <Sun size={20} /> : <Moon size={20} />}
+              </div>
+              <AnimatePresence>
+                {!isCollapsed && (
+                  <motion.span 
+                    variants={itemVariants}
+                    className="text-[13px] font-medium whitespace-nowrap"
+                  >
+                    {isDark ? "Modo Claro" : "Modo Oscuro"}
+                  </motion.span>
+                )}
+              </AnimatePresence>
             </button>
 
             <button 
               onClick={() => setIsSettingsOpen(true)}
               className={`w-full flex items-center gap-3 p-2.5 rounded-xl transition-all ${themeColors.text} ${themeColors.hover} ${isCollapsed ? 'justify-center' : ''}`}
             >
-              <Settings size={20} />
-              {!isCollapsed && <span className="text-[13px] font-medium whitespace-nowrap">Ajustes</span>}
+              <Settings size={20} className="shrink-0" />
+              <AnimatePresence>
+                {!isCollapsed && (
+                  <motion.span 
+                    variants={itemVariants}
+                    className="text-[13px] font-medium whitespace-nowrap"
+                  >
+                    Ajustes
+                  </motion.span>
+                )}
+              </AnimatePresence>
             </button>
 
             <div className="relative pt-2">
@@ -171,27 +209,34 @@ export default function Sidebar({ toggleTheme, isDark, setAccentColor, accentCol
                     className="flex items-center justify-between w-full overflow-hidden"
                   >
                     <div className="flex flex-col items-start overflow-hidden">
-                      <span className={`text-[12px] font-bold truncate w-full ${isDark ? 'text-white' : 'text-[#2A1D11]'}`}>Mi Cuenta</span>
-                      <span className="text-[10px] opacity-40 truncate w-full">Premium User</span>
+                      <span className={`text-[12px] font-bold truncate w-full ${isDark ? 'text-white' : 'text-[#2A1D11]'}`}>
+                        {profile?.username || "Usuario"}
+                      </span>
                     </div>
                   </motion.div>
                 )}
               </button>
 
-              {/* Account Dropdown */}
+              {/* Account Popover (Floating to the right) */}
               <AnimatePresence>
                 {isAccountOpen && !isCollapsed && (
                   <motion.div 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 10 }}
-                    className={`absolute bottom-full left-0 right-0 mb-2 p-2 rounded-xl border ${themeColors.bg} ${themeColors.border} shadow-2xl z-50`}
+                    initial={{ opacity: 0, x: -20, scale: 0.95 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    exit={{ opacity: 0, x: -20, scale: 0.95 }}
+                    className={`absolute left-[calc(100%+12px)] bottom-0 w-48 p-1.5 rounded-2xl border backdrop-blur-2xl ${themeColors.bg} ${themeColors.border} shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-[100]`}
                   >
-                    <button className={`w-full flex items-center gap-2 p-2 rounded-lg text-xs font-medium ${themeColors.text} ${themeColors.hover}`}>
-                      <UserCircle size={14} /> Mi Perfil
-                    </button>
-                    <button className={`w-full flex items-center gap-2 p-2 rounded-lg text-xs font-medium text-red-500 hover:bg-red-500/10`}>
-                      <LogOut size={14} /> Cerrar Sesión
+                    <div className="px-3 py-2 border-b border-white/5 mb-1">
+                      <p className="text-[10px] uppercase font-bold opacity-30 tracking-tighter">Sesión Activa</p>
+                    </div>
+                    <button 
+                      onClick={() => signOut().then(() => navigate("/"))}
+                      className={`w-full flex items-center gap-3 p-3 rounded-xl text-xs font-bold text-red-500 hover:bg-red-500/10 transition-all group`}
+                    >
+                      <div className="size-8 rounded-lg bg-red-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <LogOut size={16} />
+                      </div>
+                      Cerrar Sesión
                     </button>
                   </motion.div>
                 )}
@@ -239,11 +284,11 @@ export default function Sidebar({ toggleTheme, isDark, setAccentColor, accentCol
       </Modal>
 
       <Modal isOpen={isGlobalModalOpen} onClose={() => setIsGlobalModalOpen(false)} title="Acceso Rápido" isDark={isDark}>
-         <div className="grid grid-cols-1 gap-1.5">
+          <div className="grid grid-cols-1 gap-1.5">
             {[
-               { name: "Nuevo Objetivo", path: "/goals", icon: Target, color: "text-orange-500", bg: "bg-orange-500/10" },
-               { name: "Nuevo Hábito", path: "/habits", icon: Calendar, color: "text-emerald-500", bg: "bg-emerald-500/10" },
-               { name: "Nueva Nota", path: "/journal", icon: BookOpen, color: "text-blue-500", bg: "bg-blue-500/10" }
+               { name: "Nuevo Objetivo", path: "/goals", icon: Target },
+               { name: "Nuevo Hábito", path: "/habits", icon: Calendar },
+               { name: "Nueva Nota", path: "/journal", icon: BookOpen }
             ].map(item => (
                <Link 
                  key={item.name}
@@ -251,13 +296,13 @@ export default function Sidebar({ toggleTheme, isDark, setAccentColor, accentCol
                  onClick={() => setIsGlobalModalOpen(false)} 
                  className={`flex items-center gap-3 p-3 rounded-lg border transition-all group ${isDark ? 'bg-white/5 border-white/5 hover:bg-white/10' : 'bg-black/5 border-black/5 hover:bg-black/10'}`}
                >
-                  <div className={`p-2 rounded-lg ${item.bg} ${item.color} group-hover:scale-110 transition-transform`}>
+                  <div className={`p-2 rounded-lg bg-accent/10 text-accent group-hover:scale-110 transition-transform`} style={{ color: accentColor, backgroundColor: `${accentColor}15` }}>
                      <item.icon size={16} />
                   </div>
                   <span className={`font-bold text-[12px]`}>{item.name}</span>
                </Link>
             ))}
-         </div>
+          </div>
       </Modal>
     </>
   );

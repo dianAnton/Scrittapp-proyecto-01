@@ -220,7 +220,7 @@ export default function JournalView({ isDark }: { isDark: boolean }) {
       e.preventDefault();
       document.execCommand('bold', false);
     }
-    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'i') {
       e.preventDefault();
       document.execCommand('italic', false);
     }

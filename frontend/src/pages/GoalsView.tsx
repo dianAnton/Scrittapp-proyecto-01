@@ -17,12 +17,6 @@ const COLORS = [
   { name: "Amarillo", value: "bg-yellow-500" },
 ];
 
-const TYPES = [
-  { id: 'generic', name: 'Ambiciosa / Ambigua', icon: Target },
-  { id: 'boolean', name: 'Completado / No Completado', icon: CheckCircle2 },
-  { id: 'amount', name: 'Por Cantidad / Número', icon: Hash },
-  { id: 'date_deadline', name: 'Fecha Límite Específica', icon: CalendarIcon },
-];
 
 export default function GoalsView({ isDark }: { isDark: boolean }) {
   const [goals, setGoals] = useState<any[]>([]);
@@ -46,7 +40,6 @@ export default function GoalsView({ isDark }: { isDark: boolean }) {
 
   const TYPES = [
     { id: 'generic', name: 'No definido', icon: Target },
-    { id: 'boolean', name: 'Checklist', icon: CheckCircle2 },
     { id: 'amount', name: 'Cantidad', icon: Hash },
   ];
 

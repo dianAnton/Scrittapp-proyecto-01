@@ -108,13 +108,7 @@ export default function GoalDetail({ isDark }: { isDark: boolean }) {
                   </div>
                </div>
             </div>
-            <div className="flex gap-4">
-               <div className={`px-10 py-6 rounded-2xl border text-center ${isDark ? 'bg-black/30 border-white/5' : 'bg-black/5 border-black/5'}`}>
-                  <p className="text-[10px] opacity-30 uppercase font-bold tracking-widest mb-1">Progreso Real</p>
-                  <p className="text-4xl font-bold">{progress}%</p>
-               </div>
-            </div>
-         </div>
+          </div>
          {goal.description && (
             <div className={`mt-10 p-6 rounded-xl border ${isDark ? 'bg-white/5 border-white/5 text-white/60' : 'bg-black/5 border-black/5 text-black/60'} text-sm leading-relaxed italic`}>
                "{goal.description}"
@@ -153,13 +147,6 @@ export default function GoalDetail({ isDark }: { isDark: boolean }) {
                ].map(stat => (
                   <div key={stat.label}>
                      <div className="flex justify-between mb-2"><span className="text-sm opacity-50">{stat.label}</span><span className="text-sm font-bold">{stat.val}</span></div>
-                     <div className="w-full h-1.5 bg-black/5 rounded-full overflow-hidden">
-                       <motion.div 
-                         initial={{ width: 0 }}
-                         animate={{ width: `${stat.percentage}%` }}
-                         className={`h-full ${stat.col} rounded-full`} 
-                       />
-                     </div>
                   </div>
                ))}
             </div>

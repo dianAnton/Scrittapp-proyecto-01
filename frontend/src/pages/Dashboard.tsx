@@ -142,14 +142,6 @@ export default function Dashboard({ isDark }: { isDark: boolean }) {
                               <div className={`w-1.5 h-1.5 rounded-full ${goal.color || 'bg-accent'}`} />
                               <p className={`font-bold text-sm truncate ${isDark ? 'text-white' : 'text-[#2A1D11]'}`}>{goal.title}</p>
                            </div>
-                           <span className="text-[10px] font-bold opacity-30">{progress}%</span>
-                        </div>
-                        <div className="w-full h-1 bg-black/5 rounded-full overflow-hidden">
-                           <motion.div 
-                              initial={{ width: 0 }}
-                              animate={{ width: `${progress}%` }}
-                              className={`h-full ${goal.color || 'bg-accent'} rounded-full`} 
-                           />
                         </div>
                      </div>
                   </div>

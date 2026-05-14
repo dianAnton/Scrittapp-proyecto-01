@@ -94,13 +94,13 @@ export default function CalendarView({ isDark }: { isDark: boolean }) {
           ))}
         </div>
         <div className="grid grid-cols-7">
-          {blanks.map(b => <div key={`b-${b}`} className={`h-24 border-b border-r ${isDark ? 'border-white/5' : 'border-black/5'}`} />)}
+          {blanks.map(b => <div key={`b-${b}`} className={`h-20 border-b border-r ${isDark ? 'border-white/5' : 'border-black/5'}`} />)}
           {days.map(day => {
             const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
             const dayLogs = logs.filter(l => l.date === dateStr && l.completed);
             const isToday = dateStr === getLocalDateString(new Date());
             return (
-              <div key={day} onClick={() => { setCurrentDate(new Date(dateStr + "T00:00:00")); setView('day'); }} className={`h-24 border-b border-r p-2 flex flex-col gap-1.5 hover:bg-accent/5 transition-all cursor-pointer group ${isDark ? 'border-white/5' : 'border-black/5'}`}>
+              <div key={day} onClick={() => { setCurrentDate(new Date(dateStr + "T00:00:00")); setView('day'); }} className={`h-20 border-b border-r p-2 flex flex-col gap-1.5 hover:bg-accent/5 transition-all cursor-pointer group ${isDark ? 'border-white/5' : 'border-black/5'}`}>
                 <span className={`text-[10px] font-bold w-6 h-6 flex items-center justify-center rounded-lg transition-all ${isToday ? 'bg-accent text-white shadow-lg' : 'opacity-40 group-hover:opacity-80 group-hover:text-accent'}`}>{day}</span>
                 <div className="flex flex-wrap gap-1">
                   {dayLogs.map(l => {

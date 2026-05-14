@@ -114,7 +114,7 @@ export default function LandingPage() {
                 className="drawing-text"
                 fill="white"
                 stroke="white"
-                strokeWidth="0.2"
+                strokeWidth="1"
                 initial={{
                   fillOpacity: 0,
                   strokeDasharray: 1000,
@@ -140,7 +140,7 @@ export default function LandingPage() {
             transition={{ delay: 2.8, duration: 1 }}
             className="flex flex-col gap-2"
           >
-            <p className="text-white/60 text-lg md:text-xl font-light italic leading-relaxed max-w-lg mx-auto">
+            <p className="text-white/60 text-sm md:text-base font-light italic leading-relaxed max-w-lg mx-auto">
               "{VERSES[verseIndex]?.text}"
             </p>
             <span className="text-[10px] font-bold tracking-[0.4em] uppercase text-accent">
@@ -155,12 +155,12 @@ export default function LandingPage() {
           style={{ willChange: "transform, opacity" }}
           transition={{ duration: 1, delay: 3.2, ease: [0.16, 1, 0.3, 1] }}
           onSubmit={handleCommand}
-          className={`w-full max-w-xl relative group ${isError ? 'animate-shake' : ''}`}
+          className={`w-full max-w-lg relative group ${isError ? 'animate-shake' : ''}`}
         >
           <div className={`absolute inset-0 bg-accent/20 blur-3xl opacity-0 group-focus-within:opacity-100 transition-opacity duration-500`} />
 
           <div 
-            className="relative flex items-center bg-white/5 backdrop-blur-2xl border border-white/10 rounded-2xl p-2 focus-within:border-accent/50 transition-all duration-300"
+            className="relative flex items-center bg-white/5 backdrop-blur-2xl border border-white/10 rounded-2xl p-1.5 focus-within:border-accent/50 transition-all duration-300"
             style={{ transform: 'translate3d(0,0,0)', backfaceVisibility: 'hidden' }}
           >
             <div className="pl-4 pr-3 text-white/10">
@@ -185,7 +185,7 @@ export default function LandingPage() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                className="relative z-10 w-full bg-transparent border-none focus:ring-0 text-white text-lg md:text-xl py-3 outline-none placeholder:text-white/10 font-light caret-white"
+                className="relative z-10 w-full bg-transparent border-none focus:ring-0 text-white text-base md:text-lg py-2 outline-none placeholder:text-white/10 font-light caret-white"
                 style={{ color: 'white' }}
               />
             </div>

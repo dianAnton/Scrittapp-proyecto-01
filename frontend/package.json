@@ -38,7 +38,7 @@
     },
     "win": {
       "target": "nsis",
-      "icon": "public/favicon.png"
+      "icon": "build/icon.png"
     },
     "nsis": {
       "oneClick": false,

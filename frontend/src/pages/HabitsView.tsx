@@ -129,7 +129,7 @@ export default function HabitsView({ isDark }: { isDark: boolean }) {
             <Calendar className="text-accent w-10 h-10" /> Gestión de Hábitos
           </h1>
         </div>
-        <button onClick={() => { resetForm(); setIsModalOpen(true); }} className="px-8 py-4 rounded-xl bg-accent hover:brightness-110 text-white font-bold shadow-[0_10px_20px_rgba(var(--accent-color-rgb),0.3)] transition-all active:scale-95 flex items-center gap-2">
+        <button onClick={() => { resetForm(); setIsModalOpen(true); }} className="flex items-center gap-2 px-6 py-3 rounded-xl bg-accent hover:brightness-110 text-white font-bold shadow-[0_10px_20px_rgba(var(--accent-color-rgb),0.3)] transition-all active:scale-95">
           <Plus size={20} /> Nuevo Hábito
         </button>
       </div>

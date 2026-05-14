@@ -154,7 +154,7 @@ export default function Dashboard({ isDark }: { isDark: boolean }) {
 
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-8 font-inter">
-      <div className={`backdrop-blur-3xl border rounded-2xl p-10 transition-all ${isDark ? 'bg-white/5 border-white/10' : 'bg-white/60 border-black/10 shadow-xl'}`}>
+      <div className={`backdrop-blur-3xl border rounded-2xl p-8 transition-all ${isDark ? 'bg-white/5 border-white/10' : 'bg-white/60 border-black/10 shadow-xl'}`}>
          <div className="flex items-center justify-between mb-8">
             <h2 className={`text-2xl font-bold flex items-center gap-3 font-sf ${isDark ? 'text-white' : 'text-[#2A1D11]'}`}><Target className="text-accent" /> Metas y Objetivos</h2>
             <button onClick={() => navigate('/goals')} className="text-accent font-bold text-sm hover:underline flex items-center gap-2">Ver todas <ArrowRight size={16} /></button>
@@ -181,8 +181,8 @@ export default function Dashboard({ isDark }: { isDark: boolean }) {
          </div>
       </div>
 
-      <div className={`backdrop-blur-3xl border rounded-2xl p-10 shadow-2xl transition-all ${isDark ? 'bg-white/5 border-white/10' : 'bg-white/60 border-black/10 shadow-xl'}`}>
-        <div className="flex items-center justify-between mb-10">
+      <div className={`backdrop-blur-3xl border rounded-2xl p-8 shadow-2xl transition-all ${isDark ? 'bg-white/5 border-white/10' : 'bg-white/60 border-black/10 shadow-xl'}`}>
+        <div className="flex items-center justify-between mb-8">
           <h2 className={`text-2xl font-bold flex items-center gap-3 font-sf ${isDark ? 'text-white' : 'text-[#2A1D11]'}`}><Zap className="text-accent" /> Hábitos Diarios</h2>
           <div className="flex items-center gap-4 bg-black/5 p-1 rounded-xl border border-black/5">
              <button onClick={() => setOffsetDays(offsetDays + 7)} className={`p-2 rounded-lg transition-all ${isDark ? 'text-white/40 hover:text-white hover:bg-white/10' : 'text-black/40 hover:text-black hover:bg-black/10'}`}><ChevronLeft size={18} /></button>
@@ -191,8 +191,8 @@ export default function Dashboard({ isDark }: { isDark: boolean }) {
         </div>
 
         <div className="overflow-x-auto pb-4">
-          <div className="min-w-[950px]">
-            <div className="grid grid-cols-[220px_repeat(14,44px)_1fr] gap-1 mb-6">
+          <div className="min-w-[800px]">
+            <div className="grid grid-cols-[180px_repeat(14,38px)_1fr] gap-1 mb-6">
               <div />
               {last14Days.map(date => {
                 const d = new Date(date + "T00:00:00");
@@ -207,19 +207,19 @@ export default function Dashboard({ isDark }: { isDark: boolean }) {
               <div className="grid grid-cols-3 gap-2 text-center text-[9px] uppercase font-bold opacity-30 tracking-widest pl-6"><span>Racha</span><span>Máx</span><span>Total</span></div>
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-1">
               {habits.map(habit => {
                 const stats = calculateStats(habit.id);
                 return (
-                  <div key={habit.id} className="grid grid-cols-[220px_repeat(14,44px)_1fr] gap-1 items-center group">
-                    <div className={`font-bold text-sm truncate pr-4 transition-colors cursor-pointer opacity-70 group-hover:opacity-100 ${isDark ? 'text-white group-hover:text-emerald-400' : 'text-[#2A1D11] group-hover:text-emerald-600'}`} onClick={() => navigate(`/habits/${habit.id}`)}>{habit.title}</div>
+                  <div key={habit.id} className="grid grid-cols-[180px_repeat(14,38px)_1fr] gap-1 items-center group">
+                    <div className={`font-bold text-[13px] truncate pr-4 transition-colors cursor-pointer opacity-70 group-hover:opacity-100 ${isDark ? 'text-white group-hover:text-emerald-400' : 'text-[#2A1D11] group-hover:text-emerald-600'}`} onClick={() => navigate(`/habits/${habit.id}`)}>{habit.title}</div>
                     {last14Days.map(date => (
-                      <div key={date} onClick={() => toggleHabit(habit.id, date)} className={`w-11 h-11 rounded-sm transition-all cursor-pointer border border-transparent ${getCellStyle(habit.id, date)}`} />
+                      <div key={date} onClick={() => toggleHabit(habit.id, date)} className={`w-9.5 h-9.5 rounded-sm transition-all cursor-pointer border border-transparent ${getCellStyle(habit.id, date)}`} />
                     ))}
                     <div className="grid grid-cols-3 gap-2 pl-6 text-center items-center">
-                       <div className="flex flex-col items-center"><div className="w-9 h-9 rounded-lg border border-emerald-500/20 flex items-center justify-center text-[11px] font-bold">{stats.current}</div></div>
-                       <div className="flex flex-col items-center"><div className="w-9 h-9 rounded-lg border border-black/5 flex items-center justify-center text-[11px] font-bold opacity-40">{stats.longest}</div></div>
-                       <div className="text-base font-bold opacity-20">{stats.total}</div>
+                       <div className="flex flex-col items-center"><div className="w-8 h-8 rounded-lg border border-emerald-500/20 flex items-center justify-center text-[10px] font-bold">{stats.current}</div></div>
+                       <div className="flex flex-col items-center"><div className="w-8 h-8 rounded-lg border border-black/5 flex items-center justify-center text-[10px] font-bold opacity-40">{stats.longest}</div></div>
+                       <div className="text-sm font-bold opacity-20">{stats.total}</div>
                     </div>
                   </div>
                 );
@@ -227,7 +227,7 @@ export default function Dashboard({ isDark }: { isDark: boolean }) {
             </div>
 
             {/* RESTORED SUMMARY ROW */}
-            <div className="grid grid-cols-[220px_repeat(14,44px)_1fr] gap-1 mt-6 pt-6 border-t border-black/5">
+            <div className="grid grid-cols-[180px_repeat(14,38px)_1fr] gap-1 mt-6 pt-6 border-t border-black/5">
                <div className={`text-[10px] uppercase font-bold tracking-widest opacity-30 ${isDark ? 'text-white' : 'text-black'}`}>Habitos Realizados</div>
                {last14Days.map(date => (
                   <div key={date} className={`text-center text-sm font-bold opacity-30 ${isDark ? 'text-white' : 'text-black'}`}>

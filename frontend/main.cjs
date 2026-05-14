@@ -1,33 +1,46 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, screen } = require('electron');
 const path = require('path');
 
 // Determinamos si estamos en desarrollo
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 
 function createWindow() {
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
+
+  // Zoom dinámico: Laptop (<1600px) vs Monitor (>1600px)
+  const initialZoom = screenWidth < 1600 ? -1.0 : -0.5;
+
   const win = new BrowserWindow({
-    width: 1300,
-    height: 900,
+    width: Math.min(1400, Math.floor(screenWidth * 0.9)),
+    height: Math.min(1000, Math.floor(screenHeight * 0.9)),
     title: "Scrittapp",
     autoHideMenuBar: true,
-    backgroundColor: '#000000', // Color inicial para evitar destellos blancos
+    backgroundColor: '#000000',
+    show: false, // Empezamos ocultos para evitar el flash negro
+    icon: path.join(__dirname, 'public/logo.png'),
     webPreferences: {
       nodeIntegration: true,
-      contextIsolation: false, // Simplificamos para desarrollo inicial
+      contextIsolation: false,
     },
-    // Estética Premium: Quitamos el marco si quieres un look más app (opcional)
-    // frame: false, 
   });
 
+  win.webContents.setZoomLevel(initialZoom);
+
   if (isDev) {
-    // Apuntamos al servidor de Vite
-    win.loadURL('http://localhost:3000');
-    // Abrimos herramientas de desarrollo opcionalmente
-    // win.webContents.openDevTools();
+    win.loadURL('http://127.0.0.1:3000');
+    win.webContents.openDevTools();
   } else {
-    // Cuando esté compilado, cargamos el archivo local
-    win.loadFile(path.join(__dirname, 'dist/index.html'));
+    const indexPath = path.join(__dirname, 'dist/index.html');
+    win.loadFile(indexPath).catch(err => {
+      console.error("Fallo al cargar:", err);
+    });
   }
+
+  win.once('ready-to-show', () => {
+    win.show();
+    win.focus();
+  });
 }
 
 app.whenReady().then(createWindow);

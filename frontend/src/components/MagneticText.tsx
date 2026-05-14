@@ -60,6 +60,8 @@ function MagneticCharacter({ char, index }: MagneticCharacterProps) {
         x: translateX,
         y: translateY,
         display: "inline-block",
+        willChange: "transform, opacity",
+        transform: "translateZ(0)", // Forzado de aceleración de hardware para nitidez
       }}
       initial={{ y: 100, opacity: 0, filter: "blur(20px)" }}
       animate={{ y: 0, opacity: 1, filter: "blur(0px)" }}

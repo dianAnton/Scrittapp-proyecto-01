@@ -124,7 +124,9 @@ export default function GoalsView({ isDark }: { isDark: boolean }) {
             <Target className="text-accent w-10 h-10" /> Objetivos y Metas
           </h1>
         </div>
-        <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 px-6 py-3 rounded-xl bg-accent hover:brightness-110 text-white font-bold shadow-xl transition-all active:scale-95"><Plus size={20} /> Nueva Meta</button>
+        <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 px-6 py-3 rounded-xl bg-accent hover:brightness-110 text-white font-bold shadow-[0_10px_20px_rgba(var(--accent-color-rgb),0.3)] transition-all active:scale-95">
+          <Plus size={20} /> Nueva Meta
+        </button>
       </div>       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {activeGoals.map((goal) => {
           const colorMap: any = {

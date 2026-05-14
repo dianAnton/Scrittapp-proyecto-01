@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { HashRouter, Routes, Route } from "react-router-dom";
 import { useEffect, useState } from "react";
 import Layout from "./Layout";
 import Dashboard from "./pages/Dashboard";
@@ -32,6 +32,13 @@ const fontStyles = `
     background-color: #0d0d0d;
     color: white;
     transition: background-color 0.3s ease;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    /* Evita desenfoques en animaciones de Electron */
+    transform: translateZ(0);
+    perspective: 1000;
+    backface-visibility: hidden;
   }
 
   /* PROTECT HERO & LANDING - ALWAYS DARK & COLOR ACCURATE */
@@ -153,7 +160,7 @@ export default function App() {
   return (
     <AuthProvider>
       <style>{fontStyles}</style>
-      <BrowserRouter>
+      <HashRouter>
         <Routes>
           <Route path="/" element={<HomeRedirect />} />
           <Route path="/auth" element={<Auth />} />
@@ -171,7 +178,7 @@ export default function App() {
             <Route path="/calendar" element={<CalendarView isDark={isDark} />} />
           </Route>
         </Routes>
-      </BrowserRouter>
+      </HashRouter>
     </AuthProvider>
   );
 }

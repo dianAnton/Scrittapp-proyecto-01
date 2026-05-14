@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { Calendar, ArrowLeft, Zap, Clock, CalendarDays, LineChart as LineChartIcon, Target, TrendingUp, Info, Hash } from "lucide-react";
+import { Calendar, ArrowLeft, Zap, Clock, CalendarDays, LineChart as LineChartIcon, Target, TrendingUp, Info, Hash, Dumbbell } from "lucide-react";
 import { motion } from "motion/react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { supabase } from "../lib/supabaseClient";
@@ -18,6 +18,7 @@ export default function HabitDetail({ isDark }: { isDark: boolean }) {
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [heatmapView, setHeatmapView] = useState<'annual' | 'monthly'>('annual');
+  const [selectedExercise, setSelectedExercise] = useState<string>("");
 
   useEffect(() => {
     const fetchHabitDetail = async () => {
@@ -51,6 +52,11 @@ export default function HabitDetail({ isDark }: { isDark: boolean }) {
       
       setHabit(habitWithGoal);
       setLogs(logsData || []);
+      
+      if (habitWithGoal.measure_type === 'training' && habitWithGoal.exercise_template?.length > 0) {
+        setSelectedExercise(habitWithGoal.exercise_template[0].name);
+      }
+      
       setLoading(false);
     };
 
@@ -90,7 +96,25 @@ export default function HabitDetail({ isDark }: { isDark: boolean }) {
   });
 
   const totalCompletions = logs.filter((l: any) => l.completed).length;
-  const averageValue = habit.measure_type !== 'boolean' ? (logs.reduce((acc: any, l: any) => acc + (l.value || 0), 0) / (logs.length || 1)).toFixed(1) : null;
+  const averageValue = habit.measure_type !== 'boolean' && habit.measure_type !== 'training' 
+    ? (logs.reduce((acc: any, l: any) => acc + (l.value || 0), 0) / (logs.length || 1)).toFixed(1) 
+    : null;
+
+  const getExerciseData = (exName: string) => {
+    return logs
+      .filter(l => l.workout_data && Array.isArray(l.workout_data))
+      .map(l => {
+        const ex = l.workout_data.find((e: any) => e.name === exName);
+        return {
+          date: new Date(l.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }),
+          sets: ex ? parseFloat(ex.actualSets) || 0 : 0,
+          reps: ex ? parseFloat(ex.actualReps) || 0 : 0,
+          rest: ex ? parseFloat(ex.actualRest) || 0 : 0,
+          fullDate: l.date
+        };
+      })
+      .sort((a, b) => a.fullDate.localeCompare(b.fullDate));
+  };
 
   return (
     <div className="p-8 max-w-7xl mx-auto font-inter space-y-10">
@@ -181,6 +205,84 @@ export default function HabitDetail({ isDark }: { isDark: boolean }) {
                     </AreaChart>
                  </ResponsiveContainer>
               </div>
+           </div>
+         )}
+
+         {/* TRAINING ANALYTICS SECTION */}
+         {habit.measure_type === 'training' && (
+           <div className="col-span-full space-y-8 animate-in fade-in slide-in-from-bottom-4 mb-4">
+             <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+               <h2 className={`text-2xl font-bold font-sf ${isDark ? 'text-white' : 'text-black'}`}>Análisis de Entrenamiento</h2>
+               <div className="flex flex-wrap gap-2">
+                 {habit.exercise_template?.map((ex: any) => (
+                   <button 
+                     key={ex.name}
+                     onClick={() => setSelectedExercise(ex.name)}
+                     className={`px-6 py-2.5 rounded-xl text-xs font-bold transition-all ${selectedExercise === ex.name ? 'bg-accent text-white shadow-lg' : isDark ? 'bg-white/5 text-white/40 hover:bg-white/10' : 'bg-black/5 text-black/40 hover:bg-black/10'}`}
+                   >
+                     {ex.name}
+                   </button>
+                 ))}
+               </div>
+             </div>
+
+             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+               <div className={`xl:col-span-2 border rounded-[2.5rem] p-10 backdrop-blur-3xl ${isDark ? 'bg-white/5 border-white/10' : 'bg-white/60 border-black/10 shadow-xl'}`}>
+                 <div className="flex items-center justify-between mb-10">
+                   <div>
+                     <h3 className={`text-lg font-bold flex items-center gap-2 ${isDark ? 'text-white' : 'text-black'}`}>
+                       <Dumbbell className="text-accent" size={20} /> Progresión de {selectedExercise}
+                     </h3>
+                     <p className="text-xs opacity-40 mt-1">Comparativa de Volumen y Repeticiones</p>
+                   </div>
+                   <div className="flex gap-4">
+                      <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-blue-500" /> <span className="text-[10px] font-bold opacity-40 uppercase">Reps</span></div>
+                      <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-orange-500" /> <span className="text-[10px] font-bold opacity-40 uppercase">Series</span></div>
+                   </div>
+                 </div>
+                 <div className="h-[350px]">
+                   <ResponsiveContainer width="100%" height="100%">
+                     <LineChart data={getExerciseData(selectedExercise)}>
+                       <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)"} vertical={false} />
+                       <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fontSize: 10, opacity: 0.3, fill: isDark ? '#fff' : '#000'}} />
+                       <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, opacity: 0.3, fill: isDark ? '#fff' : '#000'}} />
+                       <Tooltip 
+                         contentStyle={{ backgroundColor: isDark ? '#161616' : '#fff', borderRadius: '16px', border: 'none', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.2)' }}
+                         itemStyle={{ fontSize: '12px', fontWeight: 'bold' }}
+                       />
+                       <Line type="monotone" dataKey="reps" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4, strokeWidth: 2, fill: isDark ? '#000' : '#fff' }} activeDot={{ r: 6 }} />
+                       <Line type="monotone" dataKey="sets" stroke="#f97316" strokeWidth={3} dot={{ r: 4, strokeWidth: 2, fill: isDark ? '#000' : '#fff' }} activeDot={{ r: 6 }} />
+                     </LineChart>
+                   </ResponsiveContainer>
+                 </div>
+               </div>
+
+               <div className={`border rounded-[2.5rem] p-10 backdrop-blur-3xl ${isDark ? 'bg-white/5 border-white/10' : 'bg-white/60 border-black/10 shadow-xl'}`}>
+                 <h3 className={`text-lg font-bold flex items-center gap-2 mb-10 ${isDark ? 'text-white' : 'text-black'}`}>
+                   <Clock className="text-blue-500" size={20} /> Recuperación (Seg)
+                 </h3>
+                 <div className="h-[350px]">
+                   <ResponsiveContainer width="100%" height="100%">
+                     <AreaChart data={getExerciseData(selectedExercise)}>
+                       <defs>
+                         <linearGradient id="colorRest" x1="0" y1="0" x2="0" y2="1">
+                           <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                           <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                         </linearGradient>
+                       </defs>
+                       <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)"} vertical={false} />
+                       <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fontSize: 10, opacity: 0.3, fill: isDark ? '#fff' : '#000'}} />
+                       <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, opacity: 0.3, fill: isDark ? '#fff' : '#000'}} />
+                       <Tooltip 
+                         contentStyle={{ backgroundColor: isDark ? '#161616' : '#fff', borderRadius: '16px', border: 'none' }}
+                         itemStyle={{ fontSize: '12px', fontWeight: 'bold' }}
+                       />
+                       <Area type="monotone" dataKey="rest" stroke="#3b82f6" fillOpacity={1} fill="url(#colorRest)" strokeWidth={3} />
+                     </AreaChart>
+                   </ResponsiveContainer>
+                 </div>
+               </div>
+             </div>
            </div>
          )}
 

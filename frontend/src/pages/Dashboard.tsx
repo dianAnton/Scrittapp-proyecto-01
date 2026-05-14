@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Calendar, ChevronLeft, ChevronRight, Target, ArrowRight, Zap } from "lucide-react";
+import { Calendar, ChevronLeft, ChevronRight, Target, ArrowRight, Zap, Dumbbell, Clock, Hash, Timer, Plus, X } from "lucide-react";
 import { motion } from "motion/react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
@@ -19,7 +19,7 @@ export default function Dashboard({ isDark }: { isDark: boolean }) {
   const [offsetDays, setOffsetDays] = useState(0);
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [logModal, setLogModal] = useState<{ isOpen: boolean, habit: any, date: string, value: string } | null>(null);
+  const [logModal, setLogModal] = useState<{ isOpen: boolean, habit: any, date: string, value: string, workoutData?: any[], duration?: string } | null>(null);
 
   const daysCount = 14;
   const today = new Date();
@@ -61,7 +61,18 @@ export default function Dashboard({ isDark }: { isDark: boolean }) {
     const habit = habits.find(h => h.id === habitId);
     
     if (!isCompleted && habit && habit.measure_type !== 'boolean') {
-      setLogModal({ isOpen: true, habit, date, value: habit.target_value?.toString() || "" });
+      const initialWorkoutData = habit.measure_type === 'training' 
+        ? (habit.exercise_template || []).map((ex: any) => ({ ...ex, actualSets: ex.sets, actualReps: ex.reps, actualRest: ex.rest }))
+        : undefined;
+
+      setLogModal({ 
+        isOpen: true, 
+        habit, 
+        date, 
+        value: habit.target_value?.toString() || "",
+        workoutData: initialWorkoutData,
+        duration: ""
+      });
       return;
     }
 
@@ -84,11 +95,11 @@ export default function Dashboard({ isDark }: { isDark: boolean }) {
   const handleLogSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !logModal) return;
-    
-    const val = parseFloat(logModal.value);
-    const isCompleted = val >= (logModal.habit.target_value || 0);
 
     try {
+      const val = logModal.habit.measure_type === 'training' ? 1 : parseFloat(logModal.value);
+      const isCompleted = logModal.habit.measure_type === 'training' ? true : val >= (logModal.habit.target_value || 0);
+
       const { error } = await supabase
         .from("habit_logs")
         .upsert({
@@ -96,7 +107,9 @@ export default function Dashboard({ isDark }: { isDark: boolean }) {
           habit_id: logModal.habit.id,
           date: logModal.date,
           completed: isCompleted,
-          value: val
+          value: val,
+          workout_data: logModal.workoutData || [],
+          duration: logModal.duration ? parseInt(logModal.duration) : null
         }, { onConflict: 'habit_id, date' });
 
       if (error) throw error;
@@ -239,29 +252,134 @@ export default function Dashboard({ isDark }: { isDark: boolean }) {
         </div>
       </div>
       
-      {logModal && (
-        <Modal isOpen={logModal.isOpen} onClose={() => setLogModal(null)} title="Registrar Avance" isDark={isDark}>
-           <form onSubmit={handleLogSubmit} className="space-y-6">
-              <div>
-                 <p className="text-sm opacity-60 mb-4">Hábito: <span className="font-bold opacity-100">{logModal.habit.title}</span></p>
-                 <label className={`text-[10px] uppercase font-bold tracking-widest ml-1 ${isDark ? 'text-white/40' : 'text-black/40'}`}>
-                    {logModal.habit.measure_type === 'time' ? 'Minutos realizados' : `Cantidad (${logModal.habit.unit || 'unidades'})`}
-                 </label>
-                 <input 
-                   type="number" 
-                   step="any" 
-                   required 
-                   autoFocus
-                   value={logModal.value} 
-                   onChange={(e) => setLogModal({ ...logModal, value: e.target.value })} 
-                   className={`w-full border rounded-xl px-6 py-5 mt-2 focus:border-accent outline-none transition-colors text-2xl font-bold ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-black/5 border-black/10 text-black'}`} 
-                 />
-                 <p className="text-[10px] opacity-40 mt-3 italic text-center">Meta del día: {logModal.habit.target_value} {logModal.habit.unit || (logModal.habit.measure_type === 'time' ? 'min' : '')}</p>
+      <Modal isOpen={!!logModal?.isOpen} onClose={() => setLogModal(null)} title={logModal?.habit?.measure_type === 'training' ? "Resumen de Entrenamiento" : "Registrar Progreso"} isDark={isDark}>
+        <form onSubmit={handleLogSubmit} className="space-y-6">
+          {logModal?.habit?.measure_type === 'training' ? (
+            <div className="space-y-6">
+              <div className={`flex items-center gap-4 p-4 rounded-2xl border ${isDark ? 'bg-white/5 border-white/5' : 'bg-black/5 border-black/5'}`}>
+                <div className="bg-accent/20 p-3 rounded-xl">
+                   <Clock className="text-accent" size={20} />
+                </div>
+                <div className="flex-1">
+                  <label className={`block text-[10px] font-bold uppercase tracking-widest mb-1 ${isDark ? 'text-white/40' : 'text-black/40'}`}>Duración Total (Minutos)</label>
+                  <input 
+                    type="number"
+                    placeholder="Ej: 45"
+                    value={logModal.duration}
+                    onChange={(e) => setLogModal({...logModal, duration: e.target.value})}
+                    className={`w-full bg-transparent text-xl font-bold outline-none no-spinner ${isDark ? 'text-white' : 'text-black'}`}
+                  />
+                </div>
               </div>
-              <button className="w-full bg-accent hover:brightness-110 text-white font-bold py-5 rounded-xl text-lg shadow-xl transition-all active:scale-95">Guardar Progreso</button>
-           </form>
-        </Modal>
-      )}
+
+              <div className="space-y-4 max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
+                {logModal.workoutData?.map((ex, idx) => (
+                  <div key={idx} className={`border rounded-2xl p-5 space-y-4 ${isDark ? 'bg-white/5 border-white/10' : 'bg-white border-black/10 shadow-sm'}`}>
+                    <div className="flex items-center justify-between">
+                      <h4 className={`text-sm font-bold flex items-center gap-2 ${isDark ? 'text-white' : 'text-black'}`}>
+                        <Dumbbell size={16} className="text-accent" /> {ex.name}
+                      </h4>
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          const newData = logModal.workoutData?.filter((_, i) => i !== idx);
+                          setLogModal({...logModal, workoutData: newData});
+                        }}
+                        className={`transition-colors ${isDark ? 'text-white/20 hover:text-red-400' : 'text-black/20 hover:text-red-400'}`}
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                    
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="space-y-1">
+                        <label className={`text-[8px] font-bold uppercase tracking-wider ${isDark ? 'text-white/30' : 'text-black/30'}`}>Series</label>
+                        <input 
+                          type="number"
+                          value={ex.actualSets}
+                          onChange={(e) => {
+                            const newData = [...logModal.workoutData!];
+                            newData[idx].actualSets = e.target.value;
+                            setLogModal({...logModal, workoutData: newData});
+                          }}
+                          className={`w-full bg-black/5 rounded-lg py-2 px-3 text-sm font-bold outline-none no-spinner ${isDark ? 'text-white bg-white/5' : 'text-black bg-black/5'}`}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className={`text-[8px] font-bold uppercase tracking-wider ${isDark ? 'text-white/30' : 'text-black/30'}`}>Reps</label>
+                        <input 
+                          type="number"
+                          value={ex.actualReps}
+                          onChange={(e) => {
+                            const newData = [...logModal.workoutData!];
+                            newData[idx].actualReps = e.target.value;
+                            setLogModal({...logModal, workoutData: newData});
+                          }}
+                          className={`w-full bg-black/5 rounded-lg py-2 px-3 text-sm font-bold outline-none no-spinner ${isDark ? 'text-white bg-white/5' : 'text-black bg-black/5'}`}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className={`text-[8px] font-bold uppercase tracking-wider ${isDark ? 'text-white/30' : 'text-black/30'}`}>Descanso</label>
+                        <input 
+                          type="number"
+                          value={ex.actualRest}
+                          onChange={(e) => {
+                            const newData = [...logModal.workoutData!];
+                            newData[idx].actualRest = e.target.value;
+                            setLogModal({...logModal, workoutData: newData});
+                          }}
+                          className={`w-full bg-black/5 rounded-lg py-2 px-3 text-sm font-bold outline-none no-spinner ${isDark ? 'text-white bg-white/5' : 'text-black bg-black/5'}`}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                
+                <button 
+                  type="button"
+                  onClick={() => {
+                    const newData = [...(logModal.workoutData || []), { name: "", actualSets: "", actualReps: "", actualRest: "" }];
+                    setLogModal({...logModal, workoutData: newData});
+                  }}
+                  className={`w-full py-4 border-2 border-dashed rounded-2xl text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${isDark ? 'border-white/10 text-white/20 hover:border-accent/40 hover:text-accent/60' : 'border-black/10 text-black/20 hover:border-accent/40 hover:text-accent/60'}`}
+                >
+                  <Plus size={14} /> Añadir Ejercicio Extra
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <label className={`text-xs font-bold uppercase tracking-widest ${isDark ? 'text-white/40' : 'text-black/40'}`}>
+                Valor registrado ({logModal?.habit?.unit || 'cantidad'})
+              </label>
+              <input 
+                type="number"
+                autoFocus
+                value={logModal?.value}
+                onChange={(e) => setLogModal(prev => prev ? {...prev, value: e.target.value} : null)}
+                className={`w-full text-4xl font-bold bg-transparent outline-none ${isDark ? 'text-white' : 'text-black'}`}
+              />
+              <p className="text-xs opacity-40">Meta diaria: {logModal?.habit?.target_value} {logModal?.habit?.unit}</p>
+            </div>
+          )}
+
+          <div className="flex gap-3 pt-4">
+            <button 
+              type="button" 
+              onClick={() => setLogModal(null)}
+              className={`flex-1 py-4 rounded-2xl font-bold text-sm transition-all ${isDark ? 'bg-white/5 text-white/40 hover:bg-white/10' : 'bg-black/5 text-black/40 hover:bg-black/10'}`}
+            >
+              Cancelar
+            </button>
+            <button 
+              type="submit"
+              className="flex-2 py-4 bg-accent text-white rounded-2xl font-bold text-sm shadow-xl shadow-accent/20 hover:brightness-110 active:scale-95 transition-all"
+            >
+              Finalizar Registro
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

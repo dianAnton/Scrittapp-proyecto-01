@@ -1,4 +1,4 @@
-import { Calendar, Plus, Settings2, Trash2, Check, Target, Hash, Clock, Info } from "lucide-react";
+import { Calendar, Plus, Settings2, Trash2, Check, Target, Hash, Clock, Info, Dumbbell, Timer, X } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Modal from "../components/Modal";
@@ -38,6 +38,7 @@ export default function HabitsView({ isDark }: { isDark: boolean }) {
   const [measureType, setMeasureType] = useState("boolean");
   const [targetValue, setTargetValue] = useState("");
   const [unit, setUnit] = useState("");
+  const [exerciseTemplate, setExerciseTemplate] = useState<any[]>([]);
 
   const fetchData = async () => {
     if (!user) return;
@@ -71,7 +72,8 @@ export default function HabitsView({ isDark }: { isDark: boolean }) {
       color_theme: colorTheme,
       measure_type: measureType,
       target_value: targetValue ? parseFloat(targetValue) : null,
-      unit
+      unit,
+      exercise_template: measureType === 'training' ? exerciseTemplate : []
     };
 
     try {
@@ -96,6 +98,7 @@ export default function HabitsView({ isDark }: { isDark: boolean }) {
   const resetForm = () => {
     setTitle(""); setDescription(""); setGoalId(""); setFrequency("7"); setSelectedDays([]); setColorTheme(THEMES[0].value);
     setMeasureType("boolean"); setTargetValue(""); setUnit(""); setEditingHabit(null);
+    setExerciseTemplate([]);
   };
 
   const handleEdit = (habit: any, e: React.MouseEvent) => {
@@ -110,6 +113,7 @@ export default function HabitsView({ isDark }: { isDark: boolean }) {
     setMeasureType(habit.measure_type || "boolean");
     setTargetValue(habit.target_value ? habit.target_value.toString() : "");
     setUnit(habit.unit || "");
+    setExerciseTemplate(habit.exercise_template || []);
     setIsModalOpen(true);
   };
 
@@ -229,11 +233,12 @@ export default function HabitsView({ isDark }: { isDark: boolean }) {
 
           <div className="space-y-4">
              <label className={`text-[10px] uppercase font-bold tracking-widest ml-1 ${isDark ? 'text-white/40' : 'text-black/40'}`}>Método de Medición</label>
-             <div className="grid grid-cols-3 gap-2">
+             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                 {[
                    { id: 'boolean', name: 'Presencia', icon: Check, desc: 'Completado o no' },
                    { id: 'quantity', name: 'Cantidad', icon: Hash, desc: 'Ej: 5km, 2L' },
-                   { id: 'time', name: 'Tiempo', icon: Clock, desc: 'Ej: 30 min' }
+                   { id: 'time', name: 'Tiempo', icon: Clock, desc: 'Ej: 30 min' },
+                   { id: 'training', name: 'Entrenamiento', icon: Dumbbell, desc: 'Reps, series...' }
                 ].map(t => (
                    <button key={t.id} type="button" onClick={() => setMeasureType(t.id)} className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-all ${measureType === t.id ? 'bg-accent/10 border-accent shadow-[0_0_15px_rgba(var(--accent-color-rgb),0.1)]' : isDark ? 'bg-white/5 border-white/5 text-white/40' : 'bg-black/5 border-black/5 text-black/40'}`}>
                       <t.icon size={20} className={measureType === t.id ? 'text-accent' : ''} />
@@ -244,7 +249,99 @@ export default function HabitsView({ isDark }: { isDark: boolean }) {
                    </button>
                 ))}
              </div>
-             {measureType !== 'boolean' && (
+             
+             {measureType === 'training' && (
+                <div className="space-y-4 pt-4 animate-in fade-in slide-in-from-top-2">
+                  <div className="flex items-center justify-between">
+                    <label className={`text-[10px] uppercase font-bold tracking-widest ml-1 ${isDark ? 'text-white/40' : 'text-black/40'}`}>Rutina de Ejercicios</label>
+                    <button 
+                      type="button"
+                      onClick={() => setExerciseTemplate([...exerciseTemplate, { name: "", sets: "", reps: "", rest: "" }])}
+                      className="text-[10px] bg-accent/20 text-accent px-4 py-2 rounded-xl font-bold hover:bg-accent/30 transition-all flex items-center gap-1.5"
+                    >
+                      <Plus size={14} /> Añadir Ejercicio
+                    </button>
+                  </div>
+                  
+                  <div className="space-y-3 max-h-64 overflow-y-auto p-2 custom-scrollbar">
+                    {exerciseTemplate.map((ex, idx) => (
+                      <div key={idx} className={`border rounded-2xl p-4 relative group transition-all ${isDark ? 'bg-white/5 border-white/10' : 'bg-white/60 border-black/10 shadow-sm'}`}>
+                        <button 
+                          type="button"
+                          onClick={() => setExerciseTemplate(exerciseTemplate.filter((_, i) => i !== idx))}
+                          className="absolute -top-2 -right-2 bg-red-500 text-white p-1.5 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all hover:scale-110 active:scale-90 z-10"
+                        >
+                          <X size={14} />
+                        </button>
+                        <div className="space-y-3">
+                          <input 
+                            placeholder="Nombre del ejercicio (Ej: Flexiones)"
+                            value={ex.name}
+                            onChange={(e) => {
+                              const newTemp = [...exerciseTemplate];
+                              newTemp[idx].name = e.target.value;
+                              setExerciseTemplate(newTemp);
+                            }}
+                            className={`w-full border rounded-lg py-3 px-4 text-sm outline-none focus:border-accent transition-colors ${isDark ? 'bg-white/5 border-white/5 text-white' : 'bg-black/5 border-black/10 text-black'}`}
+                          />
+                          <div className="grid grid-cols-3 gap-2">
+                            <div className="flex flex-col gap-1">
+                              <span className={`text-[8px] uppercase font-bold ml-1 ${isDark ? 'text-white/20' : 'text-black/20'}`}>Series</span>
+                              <input 
+                                type="number"
+                                placeholder="Sets"
+                                value={ex.sets}
+                                onChange={(e) => {
+                                  const newTemp = [...exerciseTemplate];
+                                  newTemp[idx].sets = e.target.value;
+                                  setExerciseTemplate(newTemp);
+                                }}
+                                className={`border rounded-lg py-2 px-3 text-xs outline-none focus:border-accent no-spinner ${isDark ? 'bg-white/5 border-white/5 text-white' : 'bg-black/5 border-black/10 text-black'}`}
+                              />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                              <span className={`text-[8px] uppercase font-bold ml-1 ${isDark ? 'text-white/20' : 'text-black/20'}`}>Reps</span>
+                              <input 
+                                type="number"
+                                placeholder="Reps"
+                                value={ex.reps}
+                                onChange={(e) => {
+                                  const newTemp = [...exerciseTemplate];
+                                  newTemp[idx].reps = e.target.value;
+                                  setExerciseTemplate(newTemp);
+                                }}
+                                className={`border rounded-lg py-2 px-3 text-xs outline-none focus:border-accent no-spinner ${isDark ? 'bg-white/5 border-white/5 text-white' : 'bg-black/5 border-black/10 text-black'}`}
+                              />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                              <span className={`text-[8px] uppercase font-bold ml-1 ${isDark ? 'text-white/20' : 'text-black/20'}`}>Descanso (s)</span>
+                              <input 
+                                type="number"
+                                placeholder="Secs"
+                                value={ex.rest}
+                                onChange={(e) => {
+                                  const newTemp = [...exerciseTemplate];
+                                  newTemp[idx].rest = e.target.value;
+                                  setExerciseTemplate(newTemp);
+                                }}
+                                className={`border rounded-lg py-2 px-3 text-xs outline-none focus:border-accent no-spinner ${isDark ? 'bg-white/5 border-white/5 text-white' : 'bg-black/5 border-black/10 text-black'}`}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    {exerciseTemplate.length === 0 && (
+                      <div className="text-center py-10 border-2 border-dashed border-white/5 rounded-[2rem]">
+                        <Dumbbell className="mx-auto text-white/10 mb-3" size={32} />
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-white/20">Define tu rutina de entrenamiento</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+             )}
+
+             {measureType !== 'boolean' && measureType !== 'training' && (
                 <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2 pt-2">
                    <div>
                       <label className={`text-[10px] uppercase font-bold tracking-widest ml-1 ${isDark ? 'text-white/30' : 'text-black/30'}`}>Objetivo {measureType === 'time' ? '(Minutos)' : ''}</label>

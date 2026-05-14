@@ -24,6 +24,7 @@ export default function HabitsView({ isDark }: { isDark: boolean }) {
   const [goals, setGoals] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingHabit, setEditingHabit] = useState<any>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -117,12 +118,12 @@ export default function HabitsView({ isDark }: { isDark: boolean }) {
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if(!confirm("¿Eliminar este hábito?")) return;
-    const { error } = await supabase.from("habits").delete().eq("id", id);
+  const handleDelete = async () => {
+    if (!deleteConfirmId) return;
+    const { error } = await supabase.from("habits").delete().eq("id", deleteConfirmId);
     if (error) console.error(error);
     else fetchData();
+    setDeleteConfirmId(null);
   };
 
   return (
@@ -146,18 +147,18 @@ export default function HabitsView({ isDark }: { isDark: boolean }) {
           return (
             <div key={habit.id} onClick={() => navigate(`/habits/${habit.id}`)} className={`group cursor-pointer border rounded-[2rem] p-8 transition-all relative overflow-hidden backdrop-blur-3xl ${isDark ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-white/60 border-black/10 hover:bg-white/80 shadow-lg'}`}>
               <div className="flex items-start justify-between mb-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg" style={{ backgroundColor: themeHex }}>
+                <div className="flex items-center gap-4 min-w-0 flex-1">
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg flex-shrink-0" style={{ backgroundColor: themeHex }}>
                     {habit.measure_type === 'boolean' ? <Check size={20} /> : habit.measure_type === 'time' ? <Clock size={20} /> : <Hash size={20} />}
                   </div>
-                  <div className="min-w-0">
-                    <h3 className={`text-xl font-bold font-sf truncate block ${isDark ? 'text-white' : 'text-[#2A1D11]'}`}>{habit.title}</h3>
+                  <div className="min-w-0 flex-1">
+                    <h3 className={`text-xl font-bold font-sf truncate ${isDark ? 'text-white' : 'text-[#2A1D11]'}`} title={habit.title}>{habit.title}</h3>
                     <p className={`text-[10px] font-bold uppercase tracking-widest opacity-30 ${isDark ? 'text-white' : 'text-black'}`}>{habit.measure_type}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0">
                   <button onClick={(e) => handleEdit(habit, e)} className={`p-2 rounded-lg ${isDark ? 'hover:bg-white/10 text-white/40 hover:text-white' : 'hover:bg-black/5 text-black/40 hover:text-black'}`}><Settings2 size={16} /></button>
-                  <button onClick={(e) => handleDelete(habit.id, e)} className={`p-2 rounded-lg ${isDark ? 'hover:bg-red-500/10 text-red-500/40 hover:text-red-500' : 'hover:bg-red-500/5 text-red-500/60 hover:text-red-500'}`}><Trash2 size={16} /></button>
+                  <button onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(habit.id); }} className={`p-2 rounded-lg ${isDark ? 'hover:bg-red-500/10 text-red-500/40 hover:text-red-500' : 'hover:bg-red-500/5 text-red-500/60 hover:text-red-500'}`}><Trash2 size={16} /></button>
                 </div>
               </div>
 
@@ -165,8 +166,9 @@ export default function HabitsView({ isDark }: { isDark: boolean }) {
               
               <div className="space-y-4">
                 {goalTitle && (
-                  <div className={`flex items-center gap-2 px-4 py-2 rounded-full border text-[10px] font-bold uppercase tracking-widest w-fit ${isDark ? 'bg-white/5 border-white/5 text-white/40' : 'bg-black/5 border-black/5 text-black/40'}`}>
-                    <Target size={12} /> {goalTitle}
+                  <div className={`flex items-center gap-2 px-4 py-2 rounded-full border text-[10px] font-bold uppercase tracking-widest w-fit max-w-full ${isDark ? 'bg-white/5 border-white/5 text-white/40' : 'bg-black/5 border-black/5 text-black/40'}`}>
+                    <Target size={12} className="flex-shrink-0" /> 
+                    <span className="truncate">{goalTitle}</span>
                   </div>
                 )}
                 
@@ -213,9 +215,13 @@ export default function HabitsView({ isDark }: { isDark: boolean }) {
             <div className="grid grid-cols-2 gap-6">
                <div>
                   <label className={`text-[10px] uppercase font-bold tracking-widest ml-1 ${isDark ? 'text-white/40' : 'text-black/40'}`}>Vincular Meta</label>
-                  <select value={goalId} onChange={(e) => setGoalId(e.target.value)} className={`w-full border rounded-xl px-6 py-5 mt-2 appearance-none focus:border-accent outline-none transition-colors premium-select ${isDark ? 'bg-white/10 border-white/10 text-white' : 'bg-black/5 border-black/10 text-black'}`}>
+                  <select value={goalId} onChange={(e) => setGoalId(e.target.value)} className={`w-full border rounded-xl pl-6 pr-12 py-5 mt-2 appearance-none focus:border-accent outline-none transition-colors premium-select ${isDark ? 'bg-white/10 border-white/10 text-white' : 'bg-black/5 border-black/10 text-black'}`}>
                      <option value="">Ninguna</option>
-                     {goals.map(g => <option key={g.id} value={g.id}>{g.title}</option>)}
+                     {goals.map(g => (
+                        <option key={g.id} value={g.id}>
+                          {g.title.length > 40 ? g.title.substring(0, 40) + '...' : g.title}
+                        </option>
+                      ))}
                   </select>
                </div>
                <div>
@@ -369,6 +375,33 @@ export default function HabitsView({ isDark }: { isDark: boolean }) {
              {editingHabit ? "Actualizar Hábito" : "Forjar Hábito"}
           </button>
         </form>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal isOpen={!!deleteConfirmId} onClose={() => setDeleteConfirmId(null)} title="Eliminar Hábito" isDark={isDark}>
+        <div className="space-y-6 text-center py-4">
+          <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Trash2 size={40} className="text-red-500" />
+          </div>
+          <div className="space-y-2">
+            <h3 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-black'}`}>¿Estás completamente seguro?</h3>
+            <p className={`text-sm opacity-60 ${isDark ? 'text-white' : 'text-black'}`}>Esta acción es irreversible y se perderá todo el historial de este hábito.</p>
+          </div>
+          <div className="flex gap-4 pt-6">
+            <button 
+              onClick={() => setDeleteConfirmId(null)}
+              className={`flex-1 py-4 rounded-xl font-bold transition-all ${isDark ? 'bg-white/5 text-white hover:bg-white/10' : 'bg-black/5 text-black hover:bg-black/10'}`}
+            >
+              Cancelar
+            </button>
+            <button 
+              onClick={handleDelete}
+              className="flex-1 bg-red-500 text-white py-4 rounded-xl font-bold shadow-lg shadow-red-500/20 hover:bg-red-600 transition-all"
+            >
+              Eliminar Permanentemente
+            </button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

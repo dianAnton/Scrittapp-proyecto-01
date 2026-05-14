@@ -128,7 +128,7 @@ export default function HabitDetail({ isDark }: { isDark: boolean }) {
             <div className="flex items-center gap-6">
                <div className="p-6 rounded-2xl bg-emerald-500/20 text-emerald-500 shadow-xl"><Zap size={32} /></div>
                <div>
-                  <h1 className={`text-4xl font-bold font-sf ${isDark ? 'text-white' : 'text-[#2A1D11]'}`}>{habit.title}</h1>
+                  <h1 className={`text-4xl font-bold font-sf truncate max-w-[300px] md:max-w-[500px] ${isDark ? 'text-white' : 'text-[#2A1D11]'}`} title={habit.title}>{habit.title}</h1>
                   <p className={`opacity-40 flex items-center gap-4 text-sm mt-2 ${isDark ? 'text-white' : 'text-black'}`}>
                      <span className="flex items-center gap-1"><Clock size={14} /> {habit.specific_days ? JSON.parse(habit.specific_days).join(', ') : `${habit.frequency} x sem`}</span>
                      {habit.goal_title && <span className="flex items-center gap-1 text-orange-500 font-bold"><Target size={14} /> {habit.goal_title}</span>}

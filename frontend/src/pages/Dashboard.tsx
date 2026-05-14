@@ -357,7 +357,7 @@ export default function Dashboard({ isDark }: { isDark: boolean }) {
                 autoFocus
                 value={logModal?.value}
                 onChange={(e) => setLogModal(prev => prev ? {...prev, value: e.target.value} : null)}
-                className={`w-full text-4xl font-bold bg-transparent outline-none ${isDark ? 'text-white' : 'text-black'}`}
+                className={`w-full text-4xl font-bold bg-transparent outline-none no-spinner ${isDark ? 'text-white' : 'text-black'}`}
               />
               <p className="text-xs opacity-40">Meta diaria: {logModal?.habit?.target_value} {logModal?.habit?.unit}</p>
             </div>

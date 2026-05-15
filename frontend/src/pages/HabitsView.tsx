@@ -1,6 +1,7 @@
-import { Calendar, Plus, Settings2, Trash2, Check, Target, Hash, Clock, Info, Dumbbell, Timer, X } from "lucide-react";
+import { Calendar, Plus, Settings2, Trash2, Check, Target, Hash, Clock, Info, Dumbbell, Timer, X, ChevronDown } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "motion/react";
 import Modal from "../components/Modal";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
@@ -29,11 +30,32 @@ export default function HabitsView({ isDark }: { isDark: boolean }) {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Form State
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [selectedGoalIds, setSelectedGoalIds] = useState<string[]>([]);
+  const [frequency, setFrequency] = useState("7");
+  const [selectedDays, setSelectedDays] = useState<string[]>([]);
+  const [colorTheme, setColorTheme] = useState(THEMES[0].value);
+  const [measureType, setMeasureType] = useState("boolean");
+  const [targetValue, setTargetValue] = useState("");
+  const [unit, setUnit] = useState("");
+  const [exerciseTemplate, setExerciseTemplate] = useState<any[]>([]);
+
   // Queries
   const { data: habits = [] } = useQuery({
     queryKey: ['habits'],
     queryFn: async () => {
-      const { data, error } = await supabase.from("habits").select("*").order("created_at", { ascending: false });
+      const { data, error } = await supabase
+        .from("habits")
+        .select(`
+          *,
+          habit_goals (
+            goal_id,
+            goals (title)
+          )
+        `)
+        .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
     },
@@ -50,38 +72,34 @@ export default function HabitsView({ isDark }: { isDark: boolean }) {
     enabled: !!user,
   });
 
-  // Form State
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [goalId, setGoalId] = useState("");
-  const [frequency, setFrequency] = useState("7");
-  const [selectedDays, setSelectedDays] = useState<string[]>([]);
-  const [colorTheme, setColorTheme] = useState(THEMES[0].value);
-  const [measureType, setMeasureType] = useState("boolean");
-  const [targetValue, setTargetValue] = useState("");
-  const [unit, setUnit] = useState("");
-  const [exerciseTemplate, setExerciseTemplate] = useState<any[]>([]);
-
   const habitMutation = useMutation({
     mutationFn: async (habitData: any) => {
-      let error;
+      const { goal_ids, ...pureHabitData } = habitData;
+      let habitId = editingHabit?.id;
+
       if (editingHabit) {
-        const { error: err } = await supabase.from("habits").update(habitData).eq("id", editingHabit.id);
-        error = err;
+        const { error } = await supabase.from("habits").update(pureHabitData).eq("id", habitId);
+        if (error) throw error;
       } else {
-        const { error: err } = await supabase.from("habits").insert([habitData]);
-        error = err;
+        const { data, error } = await supabase.from("habits").insert([pureHabitData]).select().single();
+        if (error) throw error;
+        habitId = data.id;
       }
-      if (error) throw error;
+
+      // Sincronizar Metas en la tabla intermedia
+      await supabase.from("habit_goals").delete().eq("habit_id", habitId);
+      if (goal_ids && goal_ids.length > 0) {
+        const goalLinks = goal_ids.map((gid: string) => ({ habit_id: habitId, goal_id: gid }));
+        const { error: linkError } = await supabase.from("habit_goals").insert(goalLinks);
+        if (linkError) throw linkError;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['habits'] });
       setIsModalOpen(false);
       resetForm();
     },
-    onSettled: () => {
-      setLoading(false);
-    }
+    onSettled: () => setLoading(false)
   });
 
   const deleteMutation = useMutation({
@@ -104,21 +122,21 @@ export default function HabitsView({ isDark }: { isDark: boolean }) {
       user_id: user.id,
       title,
       description,
-      goal_id: goalId || null,
       frequency: selectedDays.length > 0 ? selectedDays.length : parseInt(frequency),
       specific_days: selectedDays.length > 0 ? JSON.stringify(selectedDays) : null,
       color_theme: colorTheme,
       measure_type: measureType,
       target_value: targetValue ? parseFloat(targetValue) : null,
       unit,
-      exercise_template: measureType === 'training' ? exerciseTemplate : []
+      exercise_template: measureType === 'training' ? exerciseTemplate : [],
+      goal_ids: selectedGoalIds
     };
 
     habitMutation.mutate(habitData);
   };
 
   const resetForm = () => {
-    setTitle(""); setDescription(""); setGoalId(""); setFrequency("7"); setSelectedDays([]); setColorTheme(THEMES[0].value);
+    setTitle(""); setDescription(""); setSelectedGoalIds([]); setFrequency("7"); setSelectedDays([]); setColorTheme(THEMES[0].value);
     setMeasureType("boolean"); setTargetValue(""); setUnit(""); setEditingHabit(null);
     setExerciseTemplate([]);
   };
@@ -128,7 +146,8 @@ export default function HabitsView({ isDark }: { isDark: boolean }) {
     setEditingHabit(habit);
     setTitle(habit.title);
     setDescription(habit.description || "");
-    setGoalId(habit.goal_id ? habit.goal_id.toString() : "");
+    const goalIds = habit.habit_goals?.map((hg: any) => hg.goal_id.toString()) || [];
+    setSelectedGoalIds(goalIds);
     setFrequency(habit.frequency.toString());
     setSelectedDays(habit.specific_days ? JSON.parse(habit.specific_days) : []);
     setColorTheme(habit.color_theme);
@@ -139,9 +158,8 @@ export default function HabitsView({ isDark }: { isDark: boolean }) {
     setIsModalOpen(true);
   };
 
-  const handleDelete = async () => {
-    if (!deleteConfirmId) return;
-    deleteMutation.mutate(deleteConfirmId);
+  const toggleGoal = (id: string) => {
+    setSelectedGoalIds(prev => prev.includes(id) ? prev.filter(gid => gid !== id) : [...prev, id]);
   };
 
   return (
@@ -160,7 +178,7 @@ export default function HabitsView({ isDark }: { isDark: boolean }) {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {habits.map((habit) => {
           const themeHex = THEMES.find(t => t.value === habit.color_theme)?.hex || '#ccc';
-          const goalTitle = goals.find(g => g.id === habit.goal_id)?.title;
+          const linkedGoals = habit.habit_goals?.map((hg: any) => hg.goals?.title) || [];
 
           return (
             <div key={habit.id} onClick={() => navigate(`/habits/${habit.id}`)} className={`group cursor-pointer border rounded-[2rem] p-8 transition-all relative overflow-hidden backdrop-blur-3xl ${isDark ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-white/60 border-black/10 hover:bg-white/80 shadow-lg'}`}>
@@ -183,10 +201,14 @@ export default function HabitsView({ isDark }: { isDark: boolean }) {
               <p className={`text-sm opacity-40 line-clamp-2 mb-8 h-10 ${isDark ? 'text-white' : 'text-black'}`}>{habit.description || "Sin descripción"}</p>
               
               <div className="space-y-4">
-                {goalTitle && (
-                  <div className={`flex items-center gap-2 px-4 py-2 rounded-full border text-[10px] font-bold uppercase tracking-widest w-fit max-w-full ${isDark ? 'bg-white/5 border-white/5 text-white/40' : 'bg-black/5 border-black/5 text-black/40'}`}>
-                    <Target size={12} className="flex-shrink-0" /> 
-                    <span className="truncate">{goalTitle}</span>
+                {linkedGoals.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {linkedGoals.map((gtitle: string, idx: number) => (
+                      <div key={idx} className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-[9px] font-bold uppercase tracking-widest ${isDark ? 'bg-white/5 border-white/5 text-white/40' : 'bg-black/5 border-black/5 text-black/40'}`}>
+                        <Target size={10} className="flex-shrink-0" /> 
+                        <span className="truncate max-w-[100px]">{gtitle}</span>
+                      </div>
+                    ))}
                   </div>
                 )}
                 
@@ -205,18 +227,6 @@ export default function HabitsView({ isDark }: { isDark: boolean }) {
             .custom-scrollbar::-webkit-scrollbar { width: 4px; }
             .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
             .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.2); border-radius: 10px; }
-            input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-            input[type=number] { -moz-appearance: textfield; }
-            .premium-select {
-              background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='${isDark ? 'white' : 'black'}' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19.5 8.25l-7.5 7.5-7.5-7.5' /%3E%3C/svg%3E");
-              background-repeat: no-repeat;
-              background-position: right 1.25rem center;
-              background-size: 1rem;
-            }
-            select option {
-              background: ${isDark ? '#1a1a1a' : '#ffffff'};
-              color: ${isDark ? '#ffffff' : '#000000'};
-            }
           `}</style>
 
           <div className="space-y-6">
@@ -225,24 +235,34 @@ export default function HabitsView({ isDark }: { isDark: boolean }) {
               <input required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ej: Meditación Profunda..." className={`w-full border rounded-xl px-6 py-5 mt-2 focus:border-accent outline-none transition-colors ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-black/5 border-black/10 text-black'}`} />
             </div>
 
-            <div>
-              <label className={`text-[10px] uppercase font-bold tracking-widest ml-1 ${isDark ? 'text-white/40' : 'text-black/40'}`}>Propósito (Opcional)</label>
-            <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="¿Por qué este hábito transformará tu vida?" rows={4} className={`w-full border rounded-xl px-6 py-5 mt-2 focus:border-accent outline-none transition-colors ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-black/5 border-black/10 text-black'}`} />
-            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className={`text-[10px] uppercase font-bold tracking-widest ml-1 ${isDark ? 'text-white/40' : 'text-black/40'}`}>Vincular Metas (Selección Múltiple)</label>
+                <div className={`mt-2 border rounded-xl p-2 min-h-[56px] flex flex-wrap gap-2 ${isDark ? 'bg-white/5 border-white/10' : 'bg-black/5 border-black/10'}`}>
+                  {selectedGoalIds.length > 0 ? (
+                    selectedGoalIds.map(gid => {
+                      const g = goals.find(goal => goal.id.toString() === gid);
+                      return (
+                        <div key={gid} className="bg-accent text-white px-3 py-1 rounded-lg text-[10px] font-bold flex items-center gap-2 animate-in zoom-in-50 duration-200">
+                          {g?.title.substring(0, 20)}
+                          <button type="button" onClick={() => toggleGoal(gid)} className="hover:text-white/60 transition-colors"><X size={12} /></button>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <span className="text-xs opacity-20 p-2 italic">Sin metas vinculadas</span>
+                  )}
+                </div>
+                <div className="mt-3 max-h-32 overflow-y-auto custom-scrollbar pr-2 flex flex-wrap gap-2">
+                   {goals.filter(g => !selectedGoalIds.includes(g.id.toString())).map(g => (
+                      <button key={g.id} type="button" onClick={() => toggleGoal(g.id.toString())} className={`px-4 py-2 rounded-xl text-[10px] font-bold border transition-all ${isDark ? 'bg-white/5 border-white/5 text-white/40 hover:bg-white/10' : 'bg-black/5 border-black/10 text-black/40 hover:bg-black/10'}`}>
+                        + {g.title}
+                      </button>
+                   ))}
+                </div>
+              </div>
 
-            <div className="grid grid-cols-2 gap-6">
-               <div>
-                  <label className={`text-[10px] uppercase font-bold tracking-widest ml-1 ${isDark ? 'text-white/40' : 'text-black/40'}`}>Vincular Meta</label>
-                  <select value={goalId} onChange={(e) => setGoalId(e.target.value)} className={`w-full border rounded-xl pl-6 pr-12 py-5 mt-2 appearance-none focus:border-accent outline-none transition-colors premium-select ${isDark ? 'bg-white/10 border-white/10 text-white' : 'bg-black/5 border-black/10 text-black'}`}>
-                     <option value="">Ninguna</option>
-                     {goals.map(g => (
-                        <option key={g.id} value={g.id}>
-                          {g.title.length > 40 ? g.title.substring(0, 40) + '...' : g.title}
-                        </option>
-                      ))}
-                  </select>
-               </div>
-               <div>
+              <div>
                   <label className={`text-[10px] uppercase font-bold tracking-widest ml-1 ${isDark ? 'text-white/40' : 'text-black/40'}`}>Identidad Visual</label>
                   <div className="flex flex-wrap gap-2.5 mt-3">
                      {THEMES.map(t => (
@@ -251,7 +271,7 @@ export default function HabitsView({ isDark }: { isDark: boolean }) {
                         </button>
                      ))}
                   </div>
-               </div>
+              </div>
             </div>
           </div>
 
@@ -309,58 +329,22 @@ export default function HabitsView({ isDark }: { isDark: boolean }) {
                             className={`w-full border rounded-lg py-3 px-4 text-sm outline-none focus:border-accent transition-colors ${isDark ? 'bg-white/5 border-white/5 text-white' : 'bg-black/5 border-black/10 text-black'}`}
                           />
                           <div className="grid grid-cols-3 gap-2">
-                            <div className="flex flex-col gap-1">
-                              <span className={`text-[8px] uppercase font-bold ml-1 ${isDark ? 'text-white/20' : 'text-black/20'}`}>Series</span>
-                              <input 
-                                type="number"
-                                placeholder="Sets"
-                                value={ex.sets}
-                                onChange={(e) => {
-                                  const newTemp = [...exerciseTemplate];
-                                  newTemp[idx].sets = e.target.value;
-                                  setExerciseTemplate(newTemp);
-                                }}
-                                className={`border rounded-lg py-2 px-3 text-xs outline-none focus:border-accent no-spinner ${isDark ? 'bg-white/5 border-white/5 text-white' : 'bg-black/5 border-black/10 text-black'}`}
-                              />
-                            </div>
-                            <div className="flex flex-col gap-1">
-                              <span className={`text-[8px] uppercase font-bold ml-1 ${isDark ? 'text-white/20' : 'text-black/20'}`}>Reps</span>
-                              <input 
-                                type="number"
-                                placeholder="Reps"
-                                value={ex.reps}
-                                onChange={(e) => {
-                                  const newTemp = [...exerciseTemplate];
-                                  newTemp[idx].reps = e.target.value;
-                                  setExerciseTemplate(newTemp);
-                                }}
-                                className={`border rounded-lg py-2 px-3 text-xs outline-none focus:border-accent no-spinner ${isDark ? 'bg-white/5 border-white/5 text-white' : 'bg-black/5 border-black/10 text-black'}`}
-                              />
-                            </div>
-                            <div className="flex flex-col gap-1">
-                              <span className={`text-[8px] uppercase font-bold ml-1 ${isDark ? 'text-white/20' : 'text-black/20'}`}>Descanso (s)</span>
-                              <input 
-                                type="number"
-                                placeholder="Secs"
-                                value={ex.rest}
-                                onChange={(e) => {
-                                  const newTemp = [...exerciseTemplate];
-                                  newTemp[idx].rest = e.target.value;
-                                  setExerciseTemplate(newTemp);
-                                }}
-                                className={`border rounded-lg py-2 px-3 text-xs outline-none focus:border-accent no-spinner ${isDark ? 'bg-white/5 border-white/5 text-white' : 'bg-black/5 border-black/10 text-black'}`}
-                              />
-                            </div>
+                             <div className="flex flex-col gap-1">
+                               <span className={`text-[8px] uppercase font-bold ml-1 ${isDark ? 'text-white/20' : 'text-black/20'}`}>Series</span>
+                               <input type="number" value={ex.sets} onChange={(e) => { const nt = [...exerciseTemplate]; nt[idx].sets = e.target.value; setExerciseTemplate(nt); }} className={`border rounded-lg py-2 px-3 text-xs outline-none focus:border-accent ${isDark ? 'bg-white/5 border-white/5 text-white' : 'bg-black/5 border-black/10 text-black'}`} />
+                             </div>
+                             <div className="flex flex-col gap-1">
+                               <span className={`text-[8px] uppercase font-bold ml-1 ${isDark ? 'text-white/20' : 'text-black/20'}`}>Reps</span>
+                               <input type="number" value={ex.reps} onChange={(e) => { const nt = [...exerciseTemplate]; nt[idx].reps = e.target.value; setExerciseTemplate(nt); }} className={`border rounded-lg py-2 px-3 text-xs outline-none focus:border-accent ${isDark ? 'bg-white/5 border-white/5 text-white' : 'bg-black/5 border-black/10 text-black'}`} />
+                             </div>
+                             <div className="flex flex-col gap-1">
+                               <span className={`text-[8px] uppercase font-bold ml-1 ${isDark ? 'text-white/20' : 'text-black/20'}`}>Rest</span>
+                               <input type="number" value={ex.rest} onChange={(e) => { const nt = [...exerciseTemplate]; nt[idx].rest = e.target.value; setExerciseTemplate(nt); }} className={`border rounded-lg py-2 px-3 text-xs outline-none focus:border-accent ${isDark ? 'bg-white/5 border-white/5 text-white' : 'bg-black/5 border-black/10 text-black'}`} />
+                             </div>
                           </div>
                         </div>
                       </div>
                     ))}
-                    {exerciseTemplate.length === 0 && (
-                      <div className="text-center py-10 border-2 border-dashed border-white/5 rounded-[2rem]">
-                        <Dumbbell className="mx-auto text-white/10 mb-3" size={32} />
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-white/20">Define tu rutina de entrenamiento</p>
-                      </div>
-                    )}
                   </div>
                 </div>
              )}
@@ -386,7 +370,6 @@ export default function HabitsView({ isDark }: { isDark: boolean }) {
                    <button key={day} type="button" onClick={() => setSelectedDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day])} className={`flex-1 py-4 rounded-xl text-[10px] font-bold uppercase border transition-all ${selectedDays.includes(day) ? 'bg-accent border-accent text-white shadow-lg scale-105' : isDark ? 'bg-white/5 border-white/5 text-white/30' : 'bg-black/5 border-black/5 text-black/30'}`}>{day}</button>
                 ))}
              </div>
-             <p className="text-[10px] opacity-30 italic text-center">Deja vacío para marcar como "Hábito Diario" (7 días).</p>
           </div>
 
           <button type="submit" disabled={loading} className="w-full bg-accent hover:brightness-110 text-white font-bold py-6 rounded-xl text-lg shadow-[0_10px_20px_rgba(var(--accent-color-rgb),0.3)] transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
@@ -406,18 +389,8 @@ export default function HabitsView({ isDark }: { isDark: boolean }) {
             <p className={`text-sm opacity-60 ${isDark ? 'text-white' : 'text-black'}`}>Esta acción es irreversible y se perderá todo el historial de este hábito.</p>
           </div>
           <div className="flex gap-4 pt-6">
-            <button 
-              onClick={() => setDeleteConfirmId(null)}
-              className={`flex-1 py-4 rounded-xl font-bold transition-all ${isDark ? 'bg-white/5 text-white hover:bg-white/10' : 'bg-black/5 text-black hover:bg-black/10'}`}
-            >
-              Cancelar
-            </button>
-            <button 
-              onClick={handleDelete}
-              className="flex-1 bg-red-500 text-white py-4 rounded-xl font-bold shadow-lg shadow-red-500/20 hover:bg-red-600 transition-all"
-            >
-              Eliminar Permanentemente
-            </button>
+            <button onClick={() => setDeleteConfirmId(null)} className={`flex-1 py-4 rounded-xl font-bold transition-all ${isDark ? 'bg-white/5 text-white hover:bg-white/10' : 'bg-black/5 text-black hover:bg-black/10'}`}>Cancelar</button>
+            <button onClick={() => deleteMutation.mutate(deleteConfirmId!)} className="flex-1 bg-red-500 text-white py-4 rounded-xl font-bold shadow-lg shadow-red-500/20 hover:bg-red-600 transition-all">Eliminar Permanentemente</button>
           </div>
         </div>
       </Modal>

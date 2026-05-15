@@ -28,12 +28,15 @@ export default function GoalDetail({ isDark }: { isDark: boolean }) {
         return;
       }
 
-      const { data: habitsData } = await supabase
-        .from("habits")
-        .select("*")
+      const { data: habitGoalLinks } = await supabase
+        .from("habit_goals")
+        .select(`
+          habits (*)
+        `)
         .eq("goal_id", id);
       
-      const habitIds = habitsData?.map(h => h.id) || [];
+      const habitsData = habitGoalLinks?.map((link: any) => link.habits).filter(Boolean) || [];
+      const habitIds = habitsData.map((h: any) => h.id);
       let logsData: any[] = [];
       if (habitIds.length > 0) {
         const { data } = await supabase

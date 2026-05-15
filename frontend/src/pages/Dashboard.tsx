@@ -34,7 +34,14 @@ export default function Dashboard({ isDark }: { isDark: boolean }) {
   const { data: goals = [] } = useQuery({
     queryKey: ['goals'],
     queryFn: async () => {
-      const { data, error } = await supabase.from("goals").select("*").eq("completed", false).order("created_at", { ascending: false });
+      const { data, error } = await supabase
+        .from("goals")
+        .select(`
+          *,
+          habit_goals (habit_id)
+        `)
+        .eq("completed", false)
+        .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
     },
@@ -181,12 +188,11 @@ export default function Dashboard({ isDark }: { isDark: boolean }) {
   };
 
   const calculateGoalProgress = (goal: any) => {
-    const goalHabits = habits.filter(h => h.goal_id === goal.id);
-    const habitIds = goalHabits.map(h => h.id);
+    const habitIds = goal.habit_goals?.map((hg: any) => hg.habit_id) || [];
     const goalLogs = logs.filter(l => habitIds.includes(l.habit_id) && l.completed);
     
     if (goal.type === 'amount' && goal.target_number) {
-      const totalAmount = goalLogs.reduce((acc, curr) => acc + (curr.value || 0), 0);
+      const totalAmount = goalLogs.reduce((acc: any, curr: any) => acc + (curr.value || 0), 0);
       return Math.min(100, Math.round((totalAmount / goal.target_number) * 100));
     }
     return Math.min(100, goalLogs.length * 5);

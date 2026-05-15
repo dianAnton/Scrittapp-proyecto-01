@@ -6,6 +6,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
 import { useQuery } from '@tanstack/react-query';
+import { VERSES } from "../constants/assets";
 
 const getLocalDateString = (d: Date) => {
   const offset = d.getTimezoneOffset() * 60000;
@@ -27,19 +28,21 @@ export default function HabitDetail({ isDark }: { isDark: boolean }) {
         .from("habits")
         .select(`
           *,
-          goals (title)
+          habit_goals (
+            goals (title)
+          )
         `)
         .eq("id", id)
         .single();
       
       if (habitError) throw habitError;
       
-      const habitWithGoal = {
+      const habitWithGoals = {
         ...habitData,
-        goal_title: habitData.goals?.title
+        linked_goals: habitData.habit_goals?.map((hg: any) => hg.goals?.title) || []
       };
       
-      return habitWithGoal;
+      return habitWithGoals;
     },
     enabled: !!id && !!user,
   });
@@ -81,7 +84,6 @@ export default function HabitDetail({ isDark }: { isDark: boolean }) {
      return d.toLocaleDateString('es-ES', { month: 'short' });
   });
 
-  // Chart Data preparation
   const chartData = Array.from({ length: 14 }).map((_, i) => {
      const d = new Date(today);
      d.setDate(d.getDate() - (13 - i));
@@ -122,17 +124,18 @@ export default function HabitDetail({ isDark }: { isDark: boolean }) {
         <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" /> Regresar
       </button>
 
-      {/* HEADER CARD */}
       <div className={`border rounded-[2rem] p-10 backdrop-blur-3xl transition-all ${isDark ? 'bg-white/5 border-white/10' : 'bg-white/60 border-black/10 shadow-xl'}`}>
          <div className="flex flex-col md:flex-row justify-between items-center gap-8">
             <div className="flex items-center gap-6">
                <div className="p-6 rounded-2xl bg-emerald-500/20 text-emerald-500 shadow-xl"><Zap size={32} /></div>
-               <div>
+               <div className="min-w-0">
                   <h1 className={`text-4xl font-bold font-sf truncate max-w-[300px] md:max-w-[500px] ${isDark ? 'text-white' : 'text-[#2A1D11]'}`} title={habit.title}>{habit.title}</h1>
-                  <p className={`opacity-40 flex items-center gap-4 text-sm mt-2 ${isDark ? 'text-white' : 'text-black'}`}>
-                     <span className="flex items-center gap-1"><Clock size={14} /> {habit.specific_days ? JSON.parse(habit.specific_days).join(', ') : `${habit.frequency} x sem`}</span>
-                     {habit.goal_title && <span className="flex items-center gap-1 text-orange-500 font-bold"><Target size={14} /> {habit.goal_title}</span>}
-                  </p>
+                  <div className={`opacity-40 flex flex-wrap items-center gap-4 text-xs mt-3 ${isDark ? 'text-white' : 'text-black'}`}>
+                     <span className="flex items-center gap-1.5 bg-black/10 px-3 py-1 rounded-full"><Clock size={12} /> {habit.specific_days ? JSON.parse(habit.specific_days).join(', ') : `${habit.frequency} x sem`}</span>
+                     {habit.linked_goals?.map((gtitle: string, idx: number) => (
+                       <span key={idx} className="flex items-center gap-1.5 text-orange-500 font-bold bg-orange-500/10 px-3 py-1 rounded-full border border-orange-500/20 animate-in fade-in zoom-in-50 duration-300"><Target size={12} /> {gtitle}</span>
+                     ))}
+                  </div>
                </div>
             </div>
             <div className="flex gap-4">
@@ -152,7 +155,6 @@ export default function HabitDetail({ isDark }: { isDark: boolean }) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-         {/* COMPLETION CHART */}
          <div className={`border rounded-[2rem] p-10 backdrop-blur-3xl transition-all ${isDark ? 'bg-white/5 border-white/10' : 'bg-white/60 border-black/10 shadow-xl'}`}>
             <h2 className={`text-xl font-bold mb-8 flex items-center gap-3 font-sf ${isDark ? 'text-white' : 'text-black'}`}><TrendingUp className="text-emerald-500" /> Consistencia (Completado)</h2>
             <div className="h-[250px] w-full">
@@ -178,7 +180,6 @@ export default function HabitDetail({ isDark }: { isDark: boolean }) {
             </div>
          </div>
 
-         {/* QUANTITY/TIME CHART (Only for non-boolean) */}
          {habit.measure_type !== 'boolean' && (
            <div className={`border rounded-[2rem] p-10 backdrop-blur-3xl transition-all ${isDark ? 'bg-white/5 border-white/10' : 'bg-white/60 border-black/10 shadow-xl'}`}>
               <h2 className={`text-xl font-bold mb-8 flex items-center gap-3 font-sf ${isDark ? 'text-white' : 'text-black'}`}>
@@ -208,7 +209,6 @@ export default function HabitDetail({ isDark }: { isDark: boolean }) {
            </div>
          )}
 
-         {/* TRAINING ANALYTICS SECTION */}
          {habit.measure_type === 'training' && (
            <div className="col-span-full space-y-8 animate-in fade-in slide-in-from-bottom-4 mb-4">
              <div className="flex flex-col md:flex-row items-center justify-between gap-4">
@@ -229,16 +229,12 @@ export default function HabitDetail({ isDark }: { isDark: boolean }) {
              <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
                <div className={`xl:col-span-2 border rounded-[2.5rem] p-10 backdrop-blur-3xl ${isDark ? 'bg-white/5 border-white/10' : 'bg-white/60 border-black/10 shadow-xl'}`}>
                  <div className="flex items-center justify-between mb-10">
-                   <div>
-                     <h3 className={`text-lg font-bold flex items-center gap-2 ${isDark ? 'text-white' : 'text-black'}`}>
-                       <Dumbbell className="text-accent" size={20} /> Progresión de {selectedExercise}
-                     </h3>
-                     <p className="text-xs opacity-40 mt-1">Comparativa de Volumen y Repeticiones</p>
-                   </div>
-                   <div className="flex gap-4">
-                      <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-blue-500" /> <span className="text-[10px] font-bold opacity-40 uppercase">Reps</span></div>
-                      <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-orange-500" /> <span className="text-[10px] font-bold opacity-40 uppercase">Series</span></div>
-                   </div>
+                    <div>
+                      <h3 className={`text-lg font-bold flex items-center gap-2 ${isDark ? 'text-white' : 'text-black'}`}>
+                        <Dumbbell className="text-accent" size={20} /> Progresión de {selectedExercise}
+                      </h3>
+                      <p className="text-xs opacity-40 mt-1">Comparativa de Volumen y Repeticiones</p>
+                    </div>
                  </div>
                  <div className="h-[350px]">
                    <ResponsiveContainer width="100%" height="100%">
@@ -247,11 +243,11 @@ export default function HabitDetail({ isDark }: { isDark: boolean }) {
                        <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fontSize: 10, opacity: 0.3, fill: isDark ? '#fff' : '#000'}} />
                        <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, opacity: 0.3, fill: isDark ? '#fff' : '#000'}} />
                        <Tooltip 
-                         contentStyle={{ backgroundColor: isDark ? '#161616' : '#fff', borderRadius: '16px', border: 'none', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.2)' }}
+                         contentStyle={{ backgroundColor: isDark ? '#161616' : '#fff', borderRadius: '16px', border: 'none' }}
                          itemStyle={{ fontSize: '12px', fontWeight: 'bold' }}
                        />
-                       <Line type="monotone" dataKey="reps" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4, strokeWidth: 2, fill: isDark ? '#000' : '#fff' }} activeDot={{ r: 6 }} />
-                       <Line type="monotone" dataKey="sets" stroke="#f97316" strokeWidth={3} dot={{ r: 4, strokeWidth: 2, fill: isDark ? '#000' : '#fff' }} activeDot={{ r: 6 }} />
+                       <Line type="monotone" dataKey="reps" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4 }} />
+                       <Line type="monotone" dataKey="sets" stroke="#f97316" strokeWidth={3} dot={{ r: 4 }} />
                      </LineChart>
                    </ResponsiveContainer>
                  </div>
@@ -273,10 +269,6 @@ export default function HabitDetail({ isDark }: { isDark: boolean }) {
                        <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)"} vertical={false} />
                        <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fontSize: 10, opacity: 0.3, fill: isDark ? '#fff' : '#000'}} />
                        <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, opacity: 0.3, fill: isDark ? '#fff' : '#000'}} />
-                       <Tooltip 
-                         contentStyle={{ backgroundColor: isDark ? '#161616' : '#fff', borderRadius: '16px', border: 'none' }}
-                         itemStyle={{ fontSize: '12px', fontWeight: 'bold' }}
-                       />
                        <Area type="monotone" dataKey="rest" stroke="#3b82f6" fillOpacity={1} fill="url(#colorRest)" strokeWidth={3} />
                      </AreaChart>
                    </ResponsiveContainer>
@@ -286,7 +278,6 @@ export default function HabitDetail({ isDark }: { isDark: boolean }) {
            </div>
          )}
 
-         {/* HEATMAP SECTION */}
          <div className={`border rounded-[2rem] p-10 backdrop-blur-3xl transition-all ${isDark ? 'bg-white/5 border-white/10' : 'bg-white/60 border-black/10 shadow-xl'}`}>
             <div className="flex items-center justify-between mb-8">
                <h2 className={`text-xl font-bold flex items-center gap-3 font-sf ${isDark ? 'text-white' : 'text-black'}`}><CalendarDays className="text-emerald-500" /> Consistencia</h2>

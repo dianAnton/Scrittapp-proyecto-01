@@ -235,6 +235,11 @@ export default function HabitsView({ isDark }: { isDark: boolean }) {
               <input required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ej: Meditación Profunda..." className={`w-full border rounded-xl px-6 py-5 mt-2 focus:border-accent outline-none transition-colors ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-black/5 border-black/10 text-black'}`} />
             </div>
 
+            <div>
+              <label className={`text-[10px] uppercase font-bold tracking-widest ml-1 ${isDark ? 'text-white/40' : 'text-black/40'}`}>Propósito (Opcional)</label>
+              <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="¿Por qué este hábito transformará tu vida?" rows={3} className={`w-full border rounded-xl px-6 py-5 mt-2 focus:border-accent outline-none transition-colors custom-scrollbar ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-black/5 border-black/10 text-black'}`} />
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className={`text-[10px] uppercase font-bold tracking-widest ml-1 ${isDark ? 'text-white/40' : 'text-black/40'}`}>Vincular Metas (Selección Múltiple)</label>

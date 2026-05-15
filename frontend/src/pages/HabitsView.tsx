@@ -79,6 +79,9 @@ export default function HabitsView({ isDark }: { isDark: boolean }) {
       setIsModalOpen(false);
       resetForm();
     },
+    onSettled: () => {
+      setLoading(false);
+    }
   });
 
   const deleteMutation = useMutation({
@@ -386,8 +389,8 @@ export default function HabitsView({ isDark }: { isDark: boolean }) {
              <p className="text-[10px] opacity-30 italic text-center">Deja vacío para marcar como "Hábito Diario" (7 días).</p>
           </div>
 
-          <button disabled={loading} className="w-full bg-accent hover:brightness-110 text-white font-bold py-6 rounded-xl text-lg shadow-[0_10px_20px_rgba(var(--accent-color-rgb),0.3)] transition-all active:scale-95">
-             {editingHabit ? "Actualizar Hábito" : "Forjar Hábito"}
+          <button type="submit" disabled={loading} className="w-full bg-accent hover:brightness-110 text-white font-bold py-6 rounded-xl text-lg shadow-[0_10px_20px_rgba(var(--accent-color-rgb),0.3)] transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
+             {loading ? "Guardando..." : (editingHabit ? "Actualizar Hábito" : "Forjar Hábito")}
           </button>
         </form>
       </Modal>

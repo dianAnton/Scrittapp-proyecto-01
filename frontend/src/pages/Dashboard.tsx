@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
 import Modal from "../components/Modal";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 const getLocalDateString = (d: Date) => {
   const offset = d.getTimezoneOffset() * 60000;
@@ -13,13 +14,42 @@ const getLocalDateString = (d: Date) => {
 };
 
 export default function Dashboard({ isDark }: { isDark: boolean }) {
-  const [habits, setHabits] = useState<any[]>([]);
-  const [goals, setGoals] = useState<any[]>([]);
-  const [logs, setLogs] = useState<any[]>([]);
-  const [offsetDays, setOffsetDays] = useState(0);
   const navigate = useNavigate();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [offsetDays, setOffsetDays] = useState(0);
   const [logModal, setLogModal] = useState<{ isOpen: boolean, habit: any, date: string, value: string, workoutData?: any[], duration?: string } | null>(null);
+
+  // Queries
+  const { data: habits = [] } = useQuery({
+    queryKey: ['habits'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("habits").select("*");
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
+
+  const { data: goals = [] } = useQuery({
+    queryKey: ['goals'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("goals").select("*").eq("completed", false).order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
+
+  const { data: logs = [] } = useQuery({
+    queryKey: ['logs'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("habit_logs").select("*");
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
 
   const daysCount = 14;
   const today = new Date();
@@ -31,24 +61,35 @@ export default function Dashboard({ isDark }: { isDark: boolean }) {
     return getLocalDateString(d);
   });
 
-  const fetchData = async () => {
-    if (!user) return;
-    try {
-      const [hRes, gRes, lRes] = await Promise.all([
-        supabase.from("habits").select("*"),
-        supabase.from("goals").select("*").eq("completed", false).order("created_at", { ascending: false }),
-        supabase.from("habit_logs").select("*")
-      ]);
-      
-      if (hRes.data) setHabits(hRes.data);
-      if (gRes.data) setGoals(gRes.data);
-      if (lRes.data) setLogs(lRes.data);
-    } catch (e) { console.error(e); }
-  };
+  const toggleMutation = useMutation({
+    mutationFn: async ({ habitId, date, isCompleted, val }: any) => {
+      const { error } = await supabase
+        .from("habit_logs")
+        .upsert({
+          user_id: user!.id,
+          habit_id: habitId,
+          date,
+          completed: !isCompleted,
+          value: !isCompleted ? val : 0
+        }, { onConflict: 'habit_id, date' });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['logs'] });
+    },
+  });
 
-  useEffect(() => { 
-    if (user) fetchData(); 
-  }, [user]);
+  const logMutation = useMutation({
+    mutationFn: async (logData: any) => {
+      const { error } = await supabase
+        .from("habit_logs")
+        .upsert(logData, { onConflict: 'habit_id, date' });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['logs'] });
+    },
+  });
 
   const logsMap = logs.reduce((acc: any, log: any) => {
     acc[`${log.habit_id}-${log.date}`] = !!log.completed;
@@ -76,46 +117,32 @@ export default function Dashboard({ isDark }: { isDark: boolean }) {
       return;
     }
 
-    try {
-      const { error } = await supabase
-        .from("habit_logs")
-        .upsert({
-          user_id: user.id,
-          habit_id: habitId,
-          date,
-          completed: !isCompleted,
-          value: !isCompleted ? (habit?.target_value || 1) : 0
-        }, { onConflict: 'habit_id, date' });
-
-      if (error) throw error;
-      fetchData();
-    } catch (e) { console.error(e); }
+    toggleMutation.mutate({ 
+      habitId, 
+      date, 
+      isCompleted, 
+      val: habit?.target_value || 1 
+    });
   };
 
   const handleLogSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !logModal) return;
 
-    try {
-      const val = logModal.habit.measure_type === 'training' ? 1 : parseFloat(logModal.value);
-      const isCompleted = logModal.habit.measure_type === 'training' ? true : val >= (logModal.habit.target_value || 0);
+    const val = logModal.habit.measure_type === 'training' ? 1 : parseFloat(logModal.value);
+    const isCompleted = logModal.habit.measure_type === 'training' ? true : val >= (logModal.habit.target_value || 0);
 
-      const { error } = await supabase
-        .from("habit_logs")
-        .upsert({
-          user_id: user.id,
-          habit_id: logModal.habit.id,
-          date: logModal.date,
-          completed: isCompleted,
-          value: val,
-          workout_data: logModal.workoutData || [],
-          duration: logModal.duration ? parseInt(logModal.duration) : null
-        }, { onConflict: 'habit_id, date' });
-
-      if (error) throw error;
-      fetchData();
-      setLogModal(null);
-    } catch (e) { console.error(e); }
+    logMutation.mutate({
+      user_id: user.id,
+      habit_id: logModal.habit.id,
+      date: logModal.date,
+      completed: isCompleted,
+      value: val,
+      workout_data: logModal.workoutData || [],
+      duration: logModal.duration ? parseInt(logModal.duration) : null
+    });
+    
+    setLogModal(null);
   };
 
   const getStreakAtDate = (habitId: string, dateStr: string) => {
@@ -197,56 +224,71 @@ export default function Dashboard({ isDark }: { isDark: boolean }) {
       <div className={`backdrop-blur-3xl border rounded-2xl p-8 shadow-2xl transition-all ${isDark ? 'bg-white/5 border-white/10' : 'bg-white/60 border-black/10 shadow-xl'}`}>
         <div className="flex items-center justify-between mb-8">
           <h2 className={`text-2xl font-bold flex items-center gap-3 font-sf ${isDark ? 'text-white' : 'text-[#2A1D11]'}`}><Zap className="text-accent" /> Hábitos Diarios</h2>
-          <div className="flex items-center gap-4 bg-black/5 p-1 rounded-xl border border-black/5">
+          <div className="flex items-center gap-4 bg-black/5 p-1 rounded-xl border border-black/5 shrink-0">
              <button onClick={() => setOffsetDays(offsetDays + 7)} className={`p-2 rounded-lg transition-all ${isDark ? 'text-white/40 hover:text-white hover:bg-white/10' : 'text-black/40 hover:text-black hover:bg-black/10'}`}><ChevronLeft size={18} /></button>
              <button onClick={() => setOffsetDays(Math.max(0, offsetDays - 7))} disabled={offsetDays === 0} className={`p-2 rounded-lg transition-all disabled:opacity-10 ${isDark ? 'text-white/40 hover:text-white hover:bg-white/10' : 'text-black/40 hover:text-black hover:bg-black/10'}`}><ChevronRight size={18} /></button>
           </div>
         </div>
 
-        <div className="overflow-x-auto pb-4">
-          <div className="min-w-[800px]">
-            <div className="grid grid-cols-[180px_repeat(14,38px)_1fr] gap-1 mb-6">
-              <div />
-              {last14Days.map(date => {
-                const d = new Date(date + "T00:00:00");
-                const isToday = date === getLocalDateString(new Date());
-                return (
-                  <div key={date} className="flex flex-col items-center">
-                    <span className={`text-[10px] uppercase font-bold ${isToday ? 'text-accent' : 'opacity-40'}`}>{d.toLocaleDateString('es-ES', { weekday: 'short' })}</span>
-                    <span className={`text-sm font-bold ${isToday ? 'opacity-100' : 'opacity-60'}`} style={{ color: isToday ? 'var(--accent-color)' : undefined }}>{d.getDate()}</span>
-                  </div>
-                );
-              })}
-              <div className="grid grid-cols-3 gap-2 text-center text-[9px] uppercase font-bold opacity-30 tracking-widest pl-6"><span>Racha</span><span>Máx</span><span>Total</span></div>
+        <div className="overflow-x-auto pb-4 custom-scrollbar-thin relative">
+          <div className="min-w-fit">
+            {/* Header Row */}
+            <div className="flex mb-4 relative">
+              {/* Sticky Habit Label Header */}
+              <div className={`sticky left-0 z-30 w-[140px] md:w-[180px] pr-4 flex-shrink-0 font-bold text-[9px] uppercase tracking-widest opacity-20 ${isDark ? 'text-white' : 'text-black'}`}>
+                Hábitos
+              </div>
+              
+              {/* Scrolling Days Header */}
+              <div className="flex gap-1" style={{ maskImage: 'linear-gradient(to right, transparent, black 20px)' }}>
+                {last14Days.map(date => {
+                  const d = new Date(date + "T00:00:00");
+                  const isToday = date === getLocalDateString(new Date());
+                  return (
+                    <div key={date} className="flex flex-col items-center min-w-[32px] md:min-w-[38px]">
+                      <span className={`text-[9px] uppercase font-bold ${isToday ? 'text-accent' : 'opacity-30'}`}>{d.toLocaleDateString('es-ES', { weekday: 'short' })}</span>
+                      <span className={`text-xs font-bold ${isToday ? 'opacity-100' : 'opacity-50'}`} style={{ color: isToday ? 'var(--accent-color)' : undefined }}>{d.getDate()}</span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Fixed Stats Header */}
+              <div className="grid grid-cols-3 gap-2 text-center text-[8px] uppercase font-bold opacity-20 tracking-widest pl-4 min-w-[120px]">
+                <span>Racha</span><span>Máx</span><span>Total</span>
+              </div>
             </div>
 
+            {/* Habit Rows */}
             <div className="space-y-1">
               {habits.map(habit => {
                 const stats = calculateStats(habit.id);
                 return (
-                  <div key={habit.id} className="grid grid-cols-[180px_repeat(14,38px)_1fr] gap-1 items-center group">
-                    <div className={`font-bold text-[13px] truncate pr-4 transition-colors cursor-pointer opacity-70 group-hover:opacity-100 ${isDark ? 'text-white group-hover:text-emerald-400' : 'text-[#2A1D11] group-hover:text-emerald-600'}`} onClick={() => navigate(`/habits/${habit.id}`)}>{habit.title}</div>
-                    {last14Days.map(date => (
-                      <div key={date} onClick={() => toggleHabit(habit.id, date)} className={`w-9.5 h-9.5 rounded-sm transition-all cursor-pointer border border-transparent ${getCellStyle(habit.id, date)}`} />
-                    ))}
-                    <div className="grid grid-cols-3 gap-2 pl-6 text-center items-center">
-                       <div className="flex flex-col items-center"><div className="w-8 h-8 rounded-lg border border-emerald-500/20 flex items-center justify-center text-[10px] font-bold">{stats.current}</div></div>
-                       <div className="flex flex-col items-center"><div className="w-8 h-8 rounded-lg border border-black/5 flex items-center justify-center text-[10px] font-bold opacity-40">{stats.longest}</div></div>
-                       <div className="text-sm font-bold opacity-20">{stats.total}</div>
+                  <div key={habit.id} className="flex items-center group">
+                    {/* Sticky Habit Name */}
+                    <div 
+                      className={`sticky left-0 z-20 w-[140px] md:w-[180px] pr-4 transition-colors cursor-pointer font-bold text-[12px] md:text-[13px] truncate ${isDark ? 'text-white/70 group-hover:text-emerald-400' : 'text-[#2A1D11]/70 group-hover:text-emerald-600'}`} 
+                      onClick={() => navigate(`/habits/${habit.id}`)}
+                    >
+                      {habit.title}
+                    </div>
+
+                    {/* Scrolling History with Mask */}
+                    <div className="flex gap-1" style={{ maskImage: 'linear-gradient(to right, transparent, black 20px)' }}>
+                      {last14Days.map(date => (
+                        <div key={date} onClick={() => toggleHabit(habit.id, date)} className={`w-8 h-8 md:w-9.5 md:h-9.5 rounded-sm transition-all cursor-pointer border border-transparent flex-shrink-0 ${getCellStyle(habit.id, date)}`} />
+                      ))}
+                    </div>
+
+                    {/* Fixed Stats */}
+                    <div className="grid grid-cols-3 gap-2 pl-4 text-center items-center min-w-[120px]">
+                       <div className="flex flex-col items-center"><div className="w-7 h-7 rounded-lg border border-emerald-500/20 flex items-center justify-center text-[9px] font-bold">{stats.current}</div></div>
+                       <div className="flex flex-col items-center"><div className="w-7 h-7 rounded-lg border border-black/5 flex items-center justify-center text-[9px] font-bold opacity-30">{stats.longest}</div></div>
+                       <div className="text-xs font-bold opacity-20">{stats.total}</div>
                     </div>
                   </div>
                 );
               })}
-            </div>
-
-            {/* RESTORED SUMMARY ROW */}
-            <div className="grid grid-cols-[180px_repeat(14,38px)_1fr] gap-1 mt-6 pt-6 border-t border-black/5">
-               <div className={`text-[10px] uppercase font-bold tracking-widest opacity-30 ${isDark ? 'text-white' : 'text-black'}`}>Habitos Realizados</div>
-               {last14Days.map(date => (
-                  <div key={date} className={`text-center text-sm font-bold opacity-30 ${isDark ? 'text-white' : 'text-black'}`}>
-                     {habits.filter(h => logsMap[`${h.id}-${date}`]).length}
-                  </div>
-               ))}
             </div>
           </div>
         </div>

@@ -17,6 +17,7 @@ import Modal from "./Modal";
 import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabaseClient";
 import { Loader2 } from "lucide-react";
+import SyncStatus from "./SyncStatus";
 
 interface SidebarProps {
   toggleTheme: () => void;
@@ -265,6 +266,10 @@ export default function Sidebar({ toggleTheme, isDark, setAccentColor, accentCol
                 )}
               </AnimatePresence>
             </button>
+            
+            <div className="pt-2">
+              <SyncStatus isDark={isDark} isCollapsed={isCollapsed} />
+            </div>
 
             <div className="relative pt-2">
               <div className="group/avatar relative">

@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import Modal from "../components/Modal";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 const THEMES = [
   { name: "Esmeralda", value: "emerald", hex: "#10b981" },
@@ -20,14 +21,34 @@ const THEMES = [
 const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
 export default function HabitsView({ isDark }: { isDark: boolean }) {
-  const [habits, setHabits] = useState<any[]>([]);
-  const [goals, setGoals] = useState<any[]>([]);
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingHabit, setEditingHabit] = useState<any>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
-  const { user } = useAuth();
+
+  // Queries
+  const { data: habits = [] } = useQuery({
+    queryKey: ['habits'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("habits").select("*").order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
+
+  const { data: goals = [] } = useQuery({
+    queryKey: ['goals'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("goals").select("id, title");
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
 
   // Form State
   const [title, setTitle] = useState("");
@@ -41,22 +62,35 @@ export default function HabitsView({ isDark }: { isDark: boolean }) {
   const [unit, setUnit] = useState("");
   const [exerciseTemplate, setExerciseTemplate] = useState<any[]>([]);
 
-  const fetchData = async () => {
-    if (!user) return;
-    try {
-      const [hRes, gRes] = await Promise.all([
-        supabase.from("habits").select("*").order("created_at", { ascending: false }),
-        supabase.from("goals").select("id, title")
-      ]);
-      
-      if (hRes.data) setHabits(hRes.data);
-      if (gRes.data) setGoals(gRes.data);
-    } catch (e) { console.error(e); }
-  };
+  const habitMutation = useMutation({
+    mutationFn: async (habitData: any) => {
+      let error;
+      if (editingHabit) {
+        const { error: err } = await supabase.from("habits").update(habitData).eq("id", editingHabit.id);
+        error = err;
+      } else {
+        const { error: err } = await supabase.from("habits").insert([habitData]);
+        error = err;
+      }
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['habits'] });
+      setIsModalOpen(false);
+      resetForm();
+    },
+  });
 
-  useEffect(() => { 
-    if (user) fetchData(); 
-  }, [user]);
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("habits").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['habits'] });
+      setDeleteConfirmId(null);
+    },
+  });
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,23 +111,7 @@ export default function HabitsView({ isDark }: { isDark: boolean }) {
       exercise_template: measureType === 'training' ? exerciseTemplate : []
     };
 
-    try {
-      let error;
-      if (editingHabit) {
-        const { error: err } = await supabase.from("habits").update(habitData).eq("id", editingHabit.id);
-        error = err;
-      } else {
-        const { error: err } = await supabase.from("habits").insert([habitData]);
-        error = err;
-      }
-
-      if (error) throw error;
-
-      fetchData();
-      setIsModalOpen(false);
-      resetForm();
-    } catch (e) { console.error(e); }
-    setLoading(false);
+    habitMutation.mutate(habitData);
   };
 
   const resetForm = () => {
@@ -120,10 +138,7 @@ export default function HabitsView({ isDark }: { isDark: boolean }) {
 
   const handleDelete = async () => {
     if (!deleteConfirmId) return;
-    const { error } = await supabase.from("habits").delete().eq("id", deleteConfirmId);
-    if (error) console.error(error);
-    else fetchData();
-    setDeleteConfirmId(null);
+    deleteMutation.mutate(deleteConfirmId);
   };
 
   return (

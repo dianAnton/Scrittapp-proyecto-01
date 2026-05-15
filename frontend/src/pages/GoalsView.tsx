@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import Modal from "../components/Modal";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 const COLORS = [
   { name: "Esmeralda", value: "bg-emerald-500" },
@@ -19,11 +20,37 @@ const COLORS = [
 
 
 export default function GoalsView({ isDark }: { isDark: boolean }) {
-  const [goals, setGoals] = useState<any[]>([]);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  // Queries
+  const { data: goals = [] } = useQuery({
+    queryKey: ['goals'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("goals")
+        .select("*")
+        .order("priority", { ascending: false })
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user,
+  });
+
+  const { data: habits = [] } = useQuery({
+    queryKey: ['habits'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("habits").select("*");
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user,
+  });
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [type, setType] = useState("generic");
@@ -43,45 +70,55 @@ export default function GoalsView({ isDark }: { isDark: boolean }) {
     { id: 'amount', name: 'Cantidad', icon: Hash },
   ];
 
-  const fetchGoals = async () => {
-    if (!user) return;
-    const { data, error } = await supabase
-      .from("goals")
-      .select("*")
-      .order("priority", { ascending: false })
-      .order("created_at", { ascending: false });
-    
-    if (error) console.error(error);
-    else setGoals(data || []);
-  };
-
-  useEffect(() => { 
-    if (user) fetchGoals(); 
-  }, [user]);
-
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user) return;
-    setLoading(true);
-    try {
-      const { error } = await supabase.from("goals").insert([{
-        user_id: user.id,
-        title,
-        description,
-        type,
-        priority,
-        target_date: dateType === 'specific' ? targetDate : null,
-        target_number: targetNumber ? parseFloat(targetNumber) : null,
-        color: PRIORITY_COLORS[priority]
-      }]);
-
+  const goalMutation = useMutation({
+    mutationFn: async (goalData: any) => {
+      const { error } = await supabase.from("goals").insert([goalData]);
       if (error) throw error;
-      
-      fetchGoals();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['goals'] });
       setIsModalOpen(false);
       resetForm();
-    } catch (e) { console.error(e); }
-    setLoading(false);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("goals").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['goals'] });
+      setDeleteConfirmId(null);
+    },
+  });
+
+  const toggleCompleteMutation = useMutation({
+    mutationFn: async ({ id, completed }: any) => {
+      const { error } = await supabase
+        .from("goals")
+        .update({ completed: !completed })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['goals'] });
+    },
+  });
+
+  const handleCreate = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    goalMutation.mutate({
+      user_id: user.id,
+      title,
+      description,
+      type,
+      priority,
+      target_date: dateType === 'specific' ? targetDate : null,
+      target_number: targetNumber ? parseFloat(targetNumber) : null,
+      color: PRIORITY_COLORS[priority]
+    });
   };
 
   const resetForm = () => { 
@@ -94,22 +131,14 @@ export default function GoalsView({ isDark }: { isDark: boolean }) {
     setDateType("none"); 
   };
 
-  const handleDelete = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!confirm("¿Eliminar meta?")) return;
-    const { error } = await supabase.from("goals").delete().eq("id", id);
-    if (error) console.error(error);
-    else fetchGoals();
+  const handleDelete = () => {
+    if (!deleteConfirmId) return;
+    deleteMutation.mutate(deleteConfirmId);
   };
-  const handleToggleComplete = async (goal: any, e: React.MouseEvent) => {
+
+  const handleToggleComplete = (goal: any, e: React.MouseEvent) => {
     e.stopPropagation();
-    const { error } = await supabase
-      .from("goals")
-      .update({ completed: !goal.completed })
-      .eq("id", goal.id);
-    
-    if (error) console.error(error);
-    else fetchGoals();
+    toggleCompleteMutation.mutate({ id: goal.id, completed: goal.completed });
   };
 
   const activeGoals = goals.filter(g => !g.completed);
@@ -142,9 +171,9 @@ export default function GoalsView({ isDark }: { isDark: boolean }) {
                 <div className={`px-4 py-2 rounded-full ${colorClass} font-bold text-[9px] uppercase tracking-widest border`}>
                    {goal.priority === 'high' ? 'Alta Prioridad' : goal.priority === 'medium' ? 'Prioridad Media' : 'Prioridad Baja'}
                 </div>
-                <div className="flex items-center gap-1">
+                 <div className="flex items-center gap-1">
                   <button onClick={(e) => handleToggleComplete(goal, e)} className={`p-2 rounded-lg transition-all opacity-0 group-hover:opacity-100 ${isDark ? 'hover:bg-emerald-500/10 text-emerald-500/60 hover:text-emerald-500' : 'hover:bg-emerald-500/5 text-emerald-600/60 hover:text-emerald-600'}`} title="Marcar como completado"><Check size={18} /></button>
-                  <button onClick={(e) => handleDelete(goal.id, e)} className={`p-2 rounded-lg transition-all opacity-0 group-hover:opacity-100 ${isDark ? 'text-red-500/60 hover:text-red-500' : 'text-red-600/60 hover:text-red-600'}`} title="Eliminar meta"><Trash2 size={18} /></button>
+                  <button onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(goal.id); }} className={`p-2 rounded-lg transition-all opacity-0 group-hover:opacity-100 ${isDark ? 'text-red-500/60 hover:text-red-500' : 'text-red-600/60 hover:text-red-600'}`} title="Eliminar meta"><Trash2 size={18} /></button>
                 </div>
               </div>
               <h3 className={`text-xl font-bold mb-2 font-sf truncate block ${isDark ? 'text-white' : 'text-[#2A1D11]'}`}>{goal.title}</h3>
@@ -168,9 +197,9 @@ export default function GoalsView({ isDark }: { isDark: boolean }) {
                   <div className={`px-4 py-2 rounded-full bg-emerald-500/10 text-emerald-500 border-emerald-500/20 font-bold text-[9px] uppercase tracking-widest border`}>
                      Completado
                   </div>
-                  <div className="flex items-center gap-1">
+                   <div className="flex items-center gap-1">
                     <button onClick={(e) => handleToggleComplete(goal, e)} className={`p-2 rounded-lg transition-all opacity-0 group-hover:opacity-100 ${isDark ? 'hover:bg-blue-500/10 text-blue-500/60 hover:text-blue-500' : 'hover:bg-blue-500/5 text-blue-600/60 hover:text-blue-600'}`} title="Desmarcar"><ArrowRight size={18} className="rotate-180" /></button>
-                    <button onClick={(e) => handleDelete(goal.id, e)} className={`p-2 rounded-lg transition-all opacity-0 group-hover:opacity-100 ${isDark ? 'text-red-500/60 hover:text-red-500' : 'text-red-600/60 hover:text-red-600'}`}><Trash2 size={18} /></button>
+                    <button onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(goal.id); }} className={`p-2 rounded-lg transition-all opacity-0 group-hover:opacity-100 ${isDark ? 'text-red-500/60 hover:text-red-500' : 'text-red-600/60 hover:text-red-600'}`}><Trash2 size={18} /></button>
                   </div>
                 </div>
                 <h3 className={`text-xl font-bold mb-2 font-sf line-through ${isDark ? 'text-white' : 'text-[#2A1D11]'}`}>{goal.title}</h3>
@@ -263,6 +292,33 @@ export default function GoalsView({ isDark }: { isDark: boolean }) {
 
           <button disabled={loading} className="w-full bg-accent hover:brightness-110 text-white font-bold py-5 rounded-xl text-lg shadow-[0_10px_20px_rgba(var(--accent-color-rgb),0.3)] transition-all active:scale-95">Crear Meta</button>
         </form>
+      </Modal>
+
+      {/* Delete Confirmation Modal (Premium Style) */}
+      <Modal isOpen={!!deleteConfirmId} onClose={() => setDeleteConfirmId(null)} title="Eliminar Meta" isDark={isDark}>
+        <div className="space-y-6 text-center py-4">
+          <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Trash2 size={40} className="text-red-500" />
+          </div>
+          <div className="space-y-2">
+            <h3 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-black'}`}>¿Eliminar este objetivo?</h3>
+            <p className={`text-sm opacity-60 ${isDark ? 'text-white' : 'text-black'}`}>Esta acción borrará la meta y desvinculará todos los hábitos asociados. No se puede deshacer.</p>
+          </div>
+          <div className="flex gap-4 pt-6">
+            <button 
+              onClick={() => setDeleteConfirmId(null)}
+              className={`flex-1 py-4 rounded-xl font-bold transition-all ${isDark ? 'bg-white/5 text-white hover:bg-white/10' : 'bg-black/5 text-black hover:bg-black/10'}`}
+            >
+              Cancelar
+            </button>
+            <button 
+              onClick={handleDelete}
+              className="flex-1 bg-red-500 text-white py-4 rounded-xl font-bold shadow-lg shadow-red-500/20 hover:bg-red-600 transition-all"
+            >
+              Confirmar Eliminación
+            </button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

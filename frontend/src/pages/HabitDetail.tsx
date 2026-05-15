@@ -4,6 +4,8 @@ import { Calendar, ArrowLeft, Zap, Clock, CalendarDays, LineChart as LineChartIc
 import { motion } from "motion/react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { supabase } from "../lib/supabaseClient";
+import { useAuth } from "../contexts/AuthContext";
+import { useQuery } from '@tanstack/react-query';
 
 const getLocalDateString = (d: Date) => {
   const offset = d.getTimezoneOffset() * 60000;
@@ -14,16 +16,13 @@ const getLocalDateString = (d: Date) => {
 export default function HabitDetail({ isDark }: { isDark: boolean }) {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [habit, setHabit] = useState<any>(null);
-  const [logs, setLogs] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
   const [heatmapView, setHeatmapView] = useState<'annual' | 'monthly'>('annual');
   const [selectedExercise, setSelectedExercise] = useState<string>("");
 
-  useEffect(() => {
-    const fetchHabitDetail = async () => {
-      if (!id) return;
-      
+  const { data: habit, isLoading: isHabitLoading } = useQuery({
+    queryKey: ['habit', id],
+    queryFn: async () => {
       const { data: habitData, error: habitError } = await supabase
         .from("habits")
         .select(`
@@ -33,37 +32,38 @@ export default function HabitDetail({ isDark }: { isDark: boolean }) {
         .eq("id", id)
         .single();
       
-      if (habitError) {
-        console.error(habitError);
-        setLoading(false);
-        return;
-      }
-
-      const { data: logsData } = await supabase
-        .from("habit_logs")
-        .select("*")
-        .eq("habit_id", id);
+      if (habitError) throw habitError;
       
-      // Map goals title back to habit for compatibility with existing UI
       const habitWithGoal = {
         ...habitData,
         goal_title: habitData.goals?.title
       };
       
-      setHabit(habitWithGoal);
-      setLogs(logsData || []);
-      
-      if (habitWithGoal.measure_type === 'training' && habitWithGoal.exercise_template?.length > 0) {
-        setSelectedExercise(habitWithGoal.exercise_template[0].name);
-      }
-      
-      setLoading(false);
-    };
+      return habitWithGoal;
+    },
+    enabled: !!id && !!user,
+  });
 
-    fetchHabitDetail();
-  }, [id]);
+  const { data: logs = [], isLoading: isLogsLoading } = useQuery({
+    queryKey: ['logs', id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("habit_logs")
+        .select("*")
+        .eq("habit_id", id);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!id && !!user,
+  });
 
-  if (loading) return <div className="p-20 text-center opacity-20">Cargando estadísticas...</div>;
+  useEffect(() => {
+    if (habit?.measure_type === 'training' && habit.exercise_template?.length > 0 && !selectedExercise) {
+      setSelectedExercise(habit.exercise_template[0].name);
+    }
+  }, [habit, selectedExercise]);
+
+  if (isHabitLoading || isLogsLoading) return <div className="p-20 text-center opacity-20">Cargando estadísticas...</div>;
   if (!habit) return <div className="p-20 text-center">Hábito no encontrado.</div>;
 
   const logsMap = logs.reduce((acc: any, log: any) => { acc[log.date] = log; return acc; }, {});

@@ -24,3 +24,17 @@
 .no-spinner {
   -moz-appearance: textfield;
 }
+
+.custom-scrollbar-thin::-webkit-scrollbar {
+  height: 4px;
+}
+.custom-scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(128, 128, 128, 0.1);
+  border-radius: 10px;
+}
+.custom-scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(128, 128, 128, 0.2);
+}

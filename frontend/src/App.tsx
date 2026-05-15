@@ -8,6 +8,8 @@ import HabitsView from "./pages/HabitsView";
 import HabitDetail from "./pages/HabitDetail";
 import JournalView from "./pages/JournalView";
 import CalendarView from "./pages/CalendarView";
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
+import { queryClient, persister } from './lib/queryClient';
 
 const fontStyles = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -158,27 +160,32 @@ export default function App() {
   const toggleTheme = () => setIsDark(!isDark);
 
   return (
-    <AuthProvider>
-      <style>{fontStyles}</style>
-      <HashRouter>
-        <Routes>
-          <Route path="/" element={<HomeRedirect />} />
-          <Route path="/auth" element={<Auth />} />
-          <Route element={
-            <ProtectedRoute>
-              <Layout toggleTheme={toggleTheme} isDark={isDark} setAccentColor={setAccentColor} accentColor={accentColor} />
-            </ProtectedRoute>
-          }>
-            <Route path="/dashboard" element={<Dashboard isDark={isDark} />} />
-            <Route path="/goals" element={<GoalsView isDark={isDark} />} />
-            <Route path="/goals/:id" element={<GoalDetail isDark={isDark} />} />
-            <Route path="/habits" element={<HabitsView isDark={isDark} />} />
-            <Route path="/habits/:id" element={<HabitDetail isDark={isDark} />} />
-            <Route path="/journal" element={<JournalView isDark={isDark} />} />
-            <Route path="/calendar" element={<CalendarView isDark={isDark} />} />
-          </Route>
-        </Routes>
-      </HashRouter>
-    </AuthProvider>
+    <PersistQueryClientProvider
+      client={queryClient}
+      persistOptions={{ persister }}
+    >
+      <AuthProvider>
+        <style>{fontStyles}</style>
+        <HashRouter>
+          <Routes>
+            <Route path="/" element={<HomeRedirect />} />
+            <Route path="/auth" element={<Auth />} />
+            <Route element={
+              <ProtectedRoute>
+                <Layout toggleTheme={toggleTheme} isDark={isDark} setAccentColor={setAccentColor} accentColor={accentColor} />
+              </ProtectedRoute>
+            }>
+              <Route path="/dashboard" element={<Dashboard isDark={isDark} />} />
+              <Route path="/goals" element={<GoalsView isDark={isDark} />} />
+              <Route path="/goals/:id" element={<GoalDetail isDark={isDark} />} />
+              <Route path="/habits" element={<HabitsView isDark={isDark} />} />
+              <Route path="/habits/:id" element={<HabitDetail isDark={isDark} />} />
+              <Route path="/journal" element={<JournalView isDark={isDark} />} />
+              <Route path="/calendar" element={<CalendarView isDark={isDark} />} />
+            </Route>
+          </Routes>
+        </HashRouter>
+      </AuthProvider>
+    </PersistQueryClientProvider>
   );
 }

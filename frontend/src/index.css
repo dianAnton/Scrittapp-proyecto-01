@@ -38,3 +38,9 @@
 .custom-scrollbar-thin::-webkit-scrollbar-thumb:hover {
   background: rgba(128, 128, 128, 0.2);
 }
+
+/* Dark mode fix for native time/date icons */
+.dark input[type="time"]::-webkit-calendar-picker-indicator,
+.dark input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}

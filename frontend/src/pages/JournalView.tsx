@@ -122,19 +122,28 @@ export default function JournalView({ isDark }: { isDark: boolean }) {
   };
 
   const handleSave = async () => {
-    if (!user || !noteIdParam || currentNoteType === 'pdf') return;
-    if (!editorRef.current) return;
+    if (!user || !noteIdParam) return;
     setIsSaving(true);
-    const content = editorRef.current.innerHTML;
+    
+    const updatePayload: any = { title: title || "Sin título" };
+    if (currentNoteType === 'text' && editorRef.current) {
+      updatePayload.content = editorRef.current.innerHTML;
+    }
     
     await supabase
       .from("notes")
-      .update({ content, title: title || "Sin título" })
+      .update(updatePayload)
       .eq("id", noteIdParam)
       .eq("user_id", user.id);
 
     setIsSaving(false);
+    
+    // Sincronizar Sidebar
     setHistory(prev => prev.map(n => n.id === noteIdParam ? { ...n, title: title || "Sin título" } : n));
+    
+    // Sincronizar Pestañas (FIX 1)
+    setOpenTabs(prev => prev.map(t => t.id === noteIdParam ? { ...t, title: title || "Sin título" } : t));
+    
     updateStats();
   };
 

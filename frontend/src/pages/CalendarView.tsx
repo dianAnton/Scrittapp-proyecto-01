@@ -75,20 +75,19 @@ export default function CalendarView({ isDark }: { isDark: boolean }) {
     enabled: !!user,
   });
 
-  const { data: dayNotes = [] } = useQuery({
-    queryKey: ['notes', getLocalDateString(currentDate)],
+  const { data: allNotes = [] } = useQuery({
+    queryKey: ['all_notes'],
     queryFn: async () => {
-      const dateStr = getLocalDateString(currentDate);
       const { data, error } = await supabase
         .from("notes")
-        .select("*")
-        .eq("date", dateStr)
-        .order("created_at", { ascending: true });
+        .select("id, title, date, type, content");
       if (error) throw error;
       return data || [];
     },
-    enabled: !!user && view === 'day',
+    enabled: !!user,
   });
+
+  const dayNotes = allNotes.filter(n => n.date === getLocalDateString(currentDate));
 
   // Mutations
   const addReminderMutation = useMutation({
@@ -204,7 +203,8 @@ export default function CalendarView({ isDark }: { isDark: boolean }) {
                 <div className="flex justify-between items-start">
                   <span className={`text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-md transition-all ${isToday ? 'bg-accent text-white shadow-md' : 'opacity-40 group-hover:opacity-100 group-hover:text-accent'}`}>{day}</span>
                   <div className="flex gap-0.5">
-                    {dayReminders.slice(0, 3).map(r => {
+                    {allNotes.some(n => n.date === dateStr) && <FileText size={10} className="text-accent opacity-60" />}
+                    {dayReminders.slice(0, 2).map(r => {
                       const colorCfg = REMINDER_COLORS.find(c => c.id === r.color) || REMINDER_COLORS[0];
                       return <div key={r.id} className={`w-1 h-1 rounded-full ${colorCfg.dot}`} />;
                     })}
@@ -258,14 +258,17 @@ export default function CalendarView({ isDark }: { isDark: boolean }) {
                  <div className="flex flex-wrap gap-1 justify-center">
                     {dayLogs.map(l => <div key={l.id} className="w-2 h-2 rounded-sm bg-accent shadow-sm" />)}
                  </div>
-                 {dayReminders.length > 0 && (
-                   <div className="flex justify-center gap-0.5">
-                     {dayReminders.slice(0, 3).map(r => {
-                       const colorCfg = REMINDER_COLORS.find(c => c.id === r.color) || REMINDER_COLORS[0];
-                       return <div key={r.id} className={`w-1 h-1 rounded-full ${colorCfg.dot}`} />;
-                     })}
-                   </div>
-                 )}
+                 <div className="flex justify-center gap-0.5 items-center">
+                    {allNotes.some(n => n.date === dateStr) && <FileText size={10} className="text-accent opacity-60 mr-1" />}
+                    {dayReminders.length > 0 && (
+                      <div className="flex gap-0.5">
+                        {dayReminders.slice(0, 3).map(r => {
+                          const colorCfg = REMINDER_COLORS.find(c => c.id === r.color) || REMINDER_COLORS[0];
+                          return <div key={r.id} className={`w-1 h-1 rounded-full ${colorCfg.dot}`} />;
+                        })}
+                      </div>
+                    )}
+                 </div>
               </div>
             </div>
           );
@@ -295,26 +298,34 @@ export default function CalendarView({ isDark }: { isDark: boolean }) {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-               {dayNotes.length > 0 ? dayNotes.map(note => (
-                 <div key={note.id} onClick={() => navigate(`/journal?date=${dateStr}&id=${note.id}`)} className={`p-4 rounded-xl border transition-all hover:bg-accent/5 cursor-pointer group relative ${isDark ? 'bg-black/20 border-white/5' : 'bg-black/[0.02] border-black/5'}`}>
-                    <div className="flex items-center gap-2 mb-2 opacity-30">
-                       <FileText size={12} className="text-accent" />
-                       <span className="text-[8px] font-bold uppercase tracking-widest">Nota</span>
-                    </div>
-                    <h3 className={`text-sm font-bold mb-1 truncate ${isDark ? 'text-white' : 'text-black'}`}>{note.title}</h3>
-                    <div 
-                      className={`text-[10px] line-clamp-3 opacity-40 leading-relaxed ${isDark ? 'text-white' : 'text-black'}`}
-                      dangerouslySetInnerHTML={{ __html: note.content }}
-                    />
-                 </div>
-               )) : (
-                 <div className={`col-span-full py-12 rounded-2xl border border-dashed flex flex-col items-center justify-center opacity-20 ${isDark ? 'border-white/20' : 'border-black/20'}`}>
-                    <FileText size={32} className="mb-2" />
-                    <p className="text-[10px] font-bold uppercase tracking-widest">Sin notas</p>
-                 </div>
-               )}
-            </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                   {dayNotes.length > 0 ? dayNotes.map(note => (
+                     <div key={note.id} onClick={() => navigate(`/journal?date=${dateStr}&id=${note.id}`)} className={`p-4 rounded-xl border transition-all hover:bg-accent/5 cursor-pointer group relative ${isDark ? 'bg-black/20 border-white/5' : 'bg-black/[0.02] border-black/5'}`}>
+                        <div className="flex items-center gap-2 mb-2 opacity-30">
+                           <FileText size={12} className={note.type === 'pdf' ? 'text-red-500' : 'text-accent'} />
+                           <span className="text-[8px] font-bold uppercase tracking-widest">{note.type === 'pdf' ? 'Archivo PDF' : 'Nota de Texto'}</span>
+                        </div>
+                        <h3 className={`text-sm font-bold mb-1 truncate ${isDark ? 'text-white' : 'text-black'}`}>{note.title}</h3>
+                        {note.type === 'text' && (
+                          <div 
+                            className={`text-[10px] line-clamp-3 opacity-40 leading-relaxed ${isDark ? 'text-white' : 'text-black'}`}
+                            dangerouslySetInnerHTML={{ __html: note.content }}
+                          />
+                        )}
+                        {note.type === 'pdf' && (
+                          <div className="flex items-center gap-2 mt-2 opacity-30">
+                            <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                            <span className="text-[9px] font-bold">Documento Adjunto</span>
+                          </div>
+                        )}
+                     </div>
+                   )) : (
+                     <div className={`col-span-full py-12 rounded-2xl border border-dashed flex flex-col items-center justify-center opacity-20 ${isDark ? 'border-white/20' : 'border-black/20'}`}>
+                        <FileText size={32} className="mb-2" />
+                        <p className="text-[10px] font-bold uppercase tracking-widest">Sin notas</p>
+                     </div>
+                   )}
+                </div>
           </div>
 
           <div className={`border rounded-[1.5rem] p-6 lg:p-8 space-y-6 ${isDark ? 'bg-white/5 border-white/10' : 'bg-white border-black/10 shadow-lg'}`}>

@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import Modal from "../components/Modal";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
+import { useQueryClient } from "@tanstack/react-query";
 
 const getLocalDateString = (d: Date) => {
   const offset = d.getTimezoneOffset() * 60000;
@@ -14,6 +15,7 @@ const getLocalDateString = (d: Date) => {
 export default function JournalView({ isDark }: { isDark: boolean }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const dateParam = searchParams.get("date");
   const noteIdParam = searchParams.get("id");
   const todayStr = getLocalDateString(new Date());
@@ -144,6 +146,7 @@ export default function JournalView({ isDark }: { isDark: boolean }) {
     // Sincronizar Pestañas (FIX 1)
     setOpenTabs(prev => prev.map(t => t.id === noteIdParam ? { ...t, title: title || "Sin título" } : t));
     
+    queryClient.invalidateQueries({ queryKey: ['all_notes'] });
     updateStats();
   };
 
@@ -159,6 +162,7 @@ export default function JournalView({ isDark }: { isDark: boolean }) {
        setNewNoteTitle("");
        setOpenTabs(prev => [...prev, { id: data.id, title: data.title || "Nueva Nota", date: data.date, type: 'text' }]);
        setSearchParams({ date: activeDate, id: data.id });
+       queryClient.invalidateQueries({ queryKey: ['all_notes'] });
        fetchDayNotes();
     }
   };
@@ -199,6 +203,7 @@ export default function JournalView({ isDark }: { isDark: boolean }) {
         setIsNewNoteModalOpen(false);
         setOpenTabs(prev => [...prev, { id: data.id, title: data.title, date: data.date, type: 'pdf' }]);
         setSearchParams({ date: activeDate, id: data.id });
+        queryClient.invalidateQueries({ queryKey: ['all_notes'] });
         fetchDayNotes();
       }
     } catch (error) {
@@ -213,10 +218,21 @@ export default function JournalView({ isDark }: { isDark: boolean }) {
     if (!noteIdParam || !confirm("¿Eliminar esta nota?") || !user) return;
     const { error } = await supabase.from("notes").delete().eq("id", noteIdParam).eq("user_id", user.id);
     if (!error) {
+       // Quitar de la sidebar
        const newHistory = history.filter(n => n.id !== noteIdParam);
        setHistory(newHistory);
-       if (newHistory.length > 0) setSearchParams({ date: activeDate, id: newHistory[0].id });
-       else setSearchParams({ date: activeDate });
+       
+       // Quitar de las pestañas (FIX 2)
+       const newTabs = openTabs.filter(t => t.id !== noteIdParam);
+       setOpenTabs(newTabs);
+
+       if (newTabs.length > 0) {
+         const lastTab = newTabs[newTabs.length - 1];
+         setSearchParams({ date: lastTab.date, id: lastTab.id });
+       } else {
+         setSearchParams({ date: activeDate });
+       }
+       queryClient.invalidateQueries({ queryKey: ['all_notes'] });
     }
   };
 

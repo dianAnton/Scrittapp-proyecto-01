@@ -80,7 +80,8 @@ export default function CalendarView({ isDark }: { isDark: boolean }) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("notes")
-        .select("id, title, date, type, content");
+        .select("id, title, date, type, content")
+        .eq("user_id", user.id);
       if (error) throw error;
       return data || [];
     },
@@ -203,8 +204,7 @@ export default function CalendarView({ isDark }: { isDark: boolean }) {
                 <div className="flex justify-between items-start">
                   <span className={`text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-md transition-all ${isToday ? 'bg-accent text-white shadow-md' : 'opacity-40 group-hover:opacity-100 group-hover:text-accent'}`}>{day}</span>
                   <div className="flex gap-0.5">
-                    {allNotes.some(n => n.date === dateStr) && <FileText size={10} className="text-accent opacity-60" />}
-                    {dayReminders.slice(0, 2).map(r => {
+                    {dayReminders.slice(0, 3).map(r => {
                       const colorCfg = REMINDER_COLORS.find(c => c.id === r.color) || REMINDER_COLORS[0];
                       return <div key={r.id} className={`w-1 h-1 rounded-full ${colorCfg.dot}`} />;
                     })}
@@ -258,17 +258,14 @@ export default function CalendarView({ isDark }: { isDark: boolean }) {
                  <div className="flex flex-wrap gap-1 justify-center">
                     {dayLogs.map(l => <div key={l.id} className="w-2 h-2 rounded-sm bg-accent shadow-sm" />)}
                  </div>
-                 <div className="flex justify-center gap-0.5 items-center">
-                    {allNotes.some(n => n.date === dateStr) && <FileText size={10} className="text-accent opacity-60 mr-1" />}
-                    {dayReminders.length > 0 && (
-                      <div className="flex gap-0.5">
-                        {dayReminders.slice(0, 3).map(r => {
-                          const colorCfg = REMINDER_COLORS.find(c => c.id === r.color) || REMINDER_COLORS[0];
-                          return <div key={r.id} className={`w-1 h-1 rounded-full ${colorCfg.dot}`} />;
-                        })}
-                      </div>
-                    )}
-                 </div>
+                  {dayReminders.length > 0 && (
+                    <div className="flex justify-center gap-0.5">
+                      {dayReminders.slice(0, 3).map(r => {
+                        const colorCfg = REMINDER_COLORS.find(c => c.id === r.color) || REMINDER_COLORS[0];
+                        return <div key={r.id} className={`w-1 h-1 rounded-full ${colorCfg.dot}`} />;
+                      })}
+                    </div>
+                  )}
               </div>
             </div>
           );
